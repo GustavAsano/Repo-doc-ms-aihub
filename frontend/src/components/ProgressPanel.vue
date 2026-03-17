@@ -151,14 +151,12 @@ async function generate() {
       if (store.repoState) {
         store.repoState.docs_generated = true;
       }
-      // Fetch docs server URL — use the backend proxy path so the iframe
-      // works inside Docker (browser can't reach 127.0.0.1:<container-port>)
+      // Always show docs via the backend proxy — works inside Docker
+      store.docsUrl = '/docs/preview/';
       try {
         const srv = await getDocsServer();
         store.mkdocsPort = srv.port;
-        // Always route through the backend proxy: /docs/preview/
-        store.docsUrl = '/docs/preview/';
-      } catch { /* not critical */ }
+      } catch (e) { console.warn('[docs] could not fetch server info:', e); }
       toast.success('Documentation generated!');
     },
     (msg) => {
