@@ -20,6 +20,14 @@
     </div>
 
     <div v-else class="groups-scroll">
+      <!-- Legend -->
+      <div class="graph-legend">
+        <span class="legend-item"><span class="legend-dot legend-module"></span>Module</span>
+        <span class="legend-item"><span class="legend-dot legend-class"></span>Class</span>
+        <span class="legend-item"><span class="legend-dot legend-function"></span>Function</span>
+        <span class="legend-item"><span class="legend-dot legend-default"></span>Other</span>
+      </div>
+
       <!-- General: all nodes -->
       <div class="group-section">
         <div class="group-header" @click="toggleGroup('__all__')">
@@ -58,12 +66,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { useTheme } from 'vuetify';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ComponentPublicInstance = any;
 import { useAppStore } from '@/stores/store';
 import { getGraph } from '@/services/backend';
 
 const store = useAppStore();
+const theme = useTheme();
 const loading = ref(false);
 const totalNodes = ref(0);
 const totalEdges = ref(0);
@@ -136,21 +146,22 @@ function buildElements(nodes: Record<string, unknown>[], edges: Record<string, u
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function cyStyle() {
+  const isLight = theme.global.name.value === 'light';
   return [
     {
       selector: 'node',
       style: {
-        'background-color': '#1e3a4a',
-        'border-color': '#2d6a7a',
+        'background-color': isLight ? '#cbd5e1' : '#1e3a4a',
+        'border-color': isLight ? '#94a3b8' : '#2d6a7a',
         'border-width': 1,
         'label': 'data(label)',
-        'color': '#e2e8f0',
+        'color': isLight ? '#0f172a' : '#e2e8f0',
         'font-size': '9px',
         'font-family': 'JetBrains Mono, monospace',
         'text-valign': 'bottom',
         'text-halign': 'center',
         'text-margin-y': 4,
-        'text-outline-color': '#080c12',
+        'text-outline-color': isLight ? '#f1f5f9' : '#080c12',
         'text-outline-width': 2,
         'text-wrap': 'ellipsis',
         'text-max-width': '90px',
@@ -161,28 +172,28 @@ function cyStyle() {
     {
       selector: 'node[tipo="module"]',
       style: {
-        'background-color': '#0d4f4a',
-        'border-color': '#14b8a6',
+        'background-color': isLight ? '#99f6e4' : '#0d4f4a',
+        'border-color': isLight ? '#0d9488' : '#14b8a6',
         'border-width': 2,
         'width': 28,
         'height': 28,
-        'color': '#5eead4',
+        'color': isLight ? '#0f172a' : '#5eead4',
       },
     },
     {
       selector: 'node[tipo="class"]',
       style: {
-        'background-color': '#312e6e',
-        'border-color': '#6366f1',
-        'color': '#a5b4fc',
+        'background-color': isLight ? '#c7d2fe' : '#312e6e',
+        'border-color': isLight ? '#6366f1' : '#6366f1',
+        'color': isLight ? '#0f172a' : '#a5b4fc',
       },
     },
     {
       selector: 'node[tipo="function"]',
       style: {
-        'background-color': '#1c2f20',
-        'border-color': '#4ade80',
-        'color': '#86efac',
+        'background-color': isLight ? '#bbf7d0' : '#1c2f20',
+        'border-color': isLight ? '#16a34a' : '#4ade80',
+        'color': isLight ? '#0f172a' : '#86efac',
       },
     },
     {
@@ -192,8 +203,8 @@ function cyStyle() {
     {
       selector: 'edge',
       style: {
-        'line-color': '#4b6480',
-        'target-arrow-color': '#6b8da6',
+        'line-color': isLight ? '#94a3b8' : '#4b6480',
+        'target-arrow-color': isLight ? '#64748b' : '#6b8da6',
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'width': 1.5,
@@ -365,10 +376,55 @@ onBeforeUnmount(() => { cyInstances.forEach((c) => c.destroy()); cyInstances.cle
 
 .cy-group-container { width: 100%; background: #080c12; }
 
+.graph-legend {
+  display: flex; align-items: center; gap: 14px;
+  padding: 6px 12px; background: #0a0e17; border-bottom: 1px solid #1f2937;
+  position: sticky; top: 0; z-index: 1;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: #6b7280; font-family: 'JetBrains Mono', monospace;
+}
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%; border-width: 1.5px; border-style: solid; flex-shrink: 0;
+}
+.legend-module   { background: #0d4f4a; border-color: #14b8a6; }
+.legend-class    { background: #312e6e; border-color: #6366f1; }
+.legend-function { background: #1c2f20; border-color: #4ade80; }
+.legend-default  { background: #1e3a4a; border-color: #2d6a7a; }
+
 .node-detail {
   padding: 8px 12px; background: #111827; border-top: 1px solid #1f2937;
   font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
 }
 .nd-path { font-size: 11px; color: #14b8a6; }
 .nd-type { font-size: 10px; color: #6b7280; margin-top: 2px; }
+</style>
+
+<style>
+.v-theme--light .graph-toolbar { background: #ffffff; border-bottom-color: #e2e8f0; }
+.v-theme--light .graph-title { color: #475569; }
+.v-theme--light .node-count { color: #94a3b8; }
+.v-theme--light .tool-btn { border-color: #e2e8f0; color: #94a3b8; }
+.v-theme--light .tool-btn:hover { border-color: #94a3b8; color: #0f172a; }
+.v-theme--light .graph-placeholder { background: #f8fafc; }
+.v-theme--light .ph-text { color: #94a3b8; }
+.v-theme--light .groups-scroll { background: #f1f5f9; }
+.v-theme--light .groups-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; }
+.v-theme--light .group-section { border-bottom-color: #e2e8f0; }
+.v-theme--light .group-header { background: #ffffff; color: #475569; }
+.v-theme--light .group-header:hover { background: #f8fafc; color: #0f172a; }
+.v-theme--light .chevron { color: #94a3b8; }
+.v-theme--light .group-name { color: #0f172a; }
+.v-theme--light .group-meta { color: #94a3b8; }
+.v-theme--light .cy-group-container { background: #f8fafc; }
+.v-theme--light .graph-legend { background: #ffffff; border-bottom-color: #e2e8f0; }
+.v-theme--light .legend-item { color: #94a3b8; }
+.v-theme--light .legend-module   { background: #99f6e4; border-color: #0d9488; }
+.v-theme--light .legend-class    { background: #c7d2fe; border-color: #6366f1; }
+.v-theme--light .legend-function { background: #bbf7d0; border-color: #16a34a; }
+.v-theme--light .legend-default  { background: #cbd5e1; border-color: #94a3b8; }
+.v-theme--light .node-detail { background: #f1f5f9; border-top-color: #e2e8f0; }
+.v-theme--light .nd-path { color: #0f766e; }
+.v-theme--light .nd-type { color: #64748b; }
 </style>

@@ -5,9 +5,10 @@
       <div class="prog-title">
         <div class="pulse-dot" :class="{ active: store.generating }"></div>
         <span>{{ store.generating ? 'Generating documentation…' : (store.repoState?.docs_generated ? 'Done' : 'Ready') }}</span>
+        <span v-if="currentPhaseLabel" class="phase-label">{{ currentPhaseLabel }}</span>
       </div>
-      <div v-if="store.progressCost !== null" class="cost-badge">
-        ${{ store.progressCost.toFixed(4) }}
+      <div v-if="store.progressCost !== null || store.progressCostBase > 0" class="cost-badge">
+        ${{ (store.progressCostBase + (store.progressCost ?? 0)).toFixed(4) }}
       </div>
     </div>
 
@@ -67,11 +68,13 @@ import { ref, computed, nextTick, watch } from 'vue';
 import { useToast } from 'vue-toastification';
 import { useAppStore } from '@/stores/store';
 import { generateDocs, getDocsServer } from '@/services/backend';
+import type { GenerationMode } from '@/types/types';
 
 const store = useAppStore();
 const toast = useToast();
 const logEl = ref<HTMLElement | null>(null);
 let abortCtrl: AbortController | null = null;
+const currentPhaseLabel = ref('');
 
 const canGenerate = computed(() =>
   !!store.repoState?.repo_name && store.llmSaved,
@@ -130,39 +133,78 @@ async function generate() {
   if (!store.repoState?.repo_name) return;
   store.generating = true;
   store.resetProgress();
+  currentPhaseLabel.value = '';
 
-  const showFunc = ['technical_and_functional', 'functional_only'].includes(store.generationMode);
+  const isBoth = store.generationMode === 'technical_and_functional';
+
+  const commonPayload = {
+    repo_name: store.repoState.repo_name,
+    language: store.language,
+    provider: store.llm.provider,
+    model: store.llm.model,
+    use_system_key: store.llm.useSystemKey,
+    api_key: store.llm.apiKey,
+    documentation_sections: store.enabledTechSections,
+  };
+
+  const finishGeneration = async () => {
+    store.generating = false;
+    currentPhaseLabel.value = '';
+    store.docsUrl = '';
+    await nextTick();
+    store.docsUrl = '/docs/preview/';
+    try {
+      const srv = await getDocsServer();
+      store.mkdocsPort = srv.port;
+    } catch (e) { console.warn('[docs] could not fetch server info:', e); }
+    toast.success('Documentation generated!');
+  };
+
+  const runFunctional = () => {
+    store.resetProgress();
+    currentPhaseLabel.value = isBoth ? 'Functional (2/2)' : '';
+    abortCtrl = generateDocs(
+      { ...commonPayload, generation_mode: 'functional_only' as GenerationMode, functional_sections: store.enabledFuncSections },
+      (ev) => store.pushProgressEvent(ev),
+      async () => {
+        if (store.repoState) store.repoState.functional_docs_generated = true;
+        await finishGeneration();
+      },
+      (msg) => {
+        store.generating = false;
+        currentPhaseLabel.value = '';
+        toast.error(msg);
+      },
+    );
+  };
+
+  const firstMode: GenerationMode = isBoth ? 'technical_only' : store.generationMode;
+  if (isBoth) currentPhaseLabel.value = 'Technical (1/2)';
 
   abortCtrl = generateDocs(
     {
-      repo_name: store.repoState.repo_name,
-      language: store.language,
-      generation_mode: store.generationMode,
-      provider: store.llm.provider,
-      model: store.llm.model,
-      use_system_key: store.llm.useSystemKey,
-      api_key: store.llm.apiKey,
-      documentation_sections: store.enabledTechSections,
-      functional_sections: showFunc ? store.enabledFuncSections : undefined,
+      ...commonPayload,
+      generation_mode: firstMode,
+      functional_sections: firstMode === 'functional_only' ? store.enabledFuncSections : undefined,
     },
     (ev) => store.pushProgressEvent(ev),
     async () => {
-      store.generating = false;
       if (store.repoState) {
-        store.repoState.docs_generated = true;
+        if (firstMode === 'functional_only') {
+          store.repoState.functional_docs_generated = true;
+        } else {
+          store.repoState.docs_generated = true;
+        }
       }
-      // Fetch docs server URL — use the backend proxy path so the iframe
-      // works inside Docker (browser can't reach 127.0.0.1:<container-port>)
-      try {
-        const srv = await getDocsServer();
-        store.mkdocsPort = srv.port;
-        // Always route through the backend proxy: /docs/preview/
-        store.docsUrl = '/docs/preview/';
-      } catch { /* not critical */ }
-      toast.success('Documentation generated!');
+      if (isBoth) {
+        runFunctional();
+        return;
+      }
+      await finishGeneration();
     },
     (msg) => {
       store.generating = false;
+      currentPhaseLabel.value = '';
       toast.error(msg);
     },
   );
@@ -188,6 +230,7 @@ function cancel() {
 .prog-bar-fill.done { background: #10b981; }
 .prog-counts { display: flex; justify-content: space-between; font-size: 10px; color: #4b5563; font-family: 'JetBrains Mono', monospace; }
 .prog-phase { color: #6b7280; font-style: italic; }
+.phase-label { color: #f59e0b; background: rgba(245,158,11,0.12); padding: 1px 7px; border-radius: 8px; font-size: 10px; }
 .gen-btn-row { display: flex; }
 .gen-btn {
   display: inline-flex; align-items: center; gap: 4px;
@@ -214,4 +257,22 @@ function cancel() {
 .ev-line.call_end .ev-msg { color: #4b5563; }
 .ev-line.done .ev-msg { color: #10b981; font-weight: 600; }
 .ev-line.error .ev-msg { color: #f87171; }
+</style>
+
+<style>
+.v-theme--light .prog-title { color: #475569; }
+.v-theme--light .pulse-dot { background: #cbd5e1; }
+.v-theme--light .cost-badge { color: #0f766e; background: rgba(15,118,110,0.1); }
+.v-theme--light .prog-bar-wrap { background: #e2e8f0; }
+.v-theme--light .prog-counts { color: #94a3b8; }
+.v-theme--light .prog-phase { color: #64748b; }
+.v-theme--light .gen-btn { border-color: #0f766e; background: rgba(15,118,110,0.08); color: #0f766e; }
+.v-theme--light .gen-btn:hover:not(:disabled) { background: rgba(15,118,110,0.15); }
+.v-theme--light .event-log { background: #f8fafc; border-color: #e2e8f0; }
+.v-theme--light .ev-line { color: #94a3b8; }
+.v-theme--light .ev-line.plan .ev-msg { color: #6366f1; }
+.v-theme--light .ev-line.call_start .ev-msg { color: #475569; }
+.v-theme--light .ev-line.call_end .ev-msg { color: #94a3b8; }
+.v-theme--light .ev-line.done .ev-msg { color: #059669; }
+.v-theme--light .ev-line.error .ev-msg { color: #dc2626; }
 </style>
