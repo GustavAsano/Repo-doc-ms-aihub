@@ -52,7 +52,10 @@ const iframeSrc = computed(() => {
 function openTab() { window.open(store.docsUrl, '_blank'); }
 function refresh() { bust.value++; iframeLoaded.value = false; }
 
-watch(() => store.docsUrl, () => { iframeLoaded.value = false; });
+watch(() => store.docsUrl, (newVal, oldVal) => {
+  iframeLoaded.value = false;
+  if (newVal && !oldVal) bust.value++;
+});
 </script>
 
 <style scoped>
