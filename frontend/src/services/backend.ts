@@ -116,7 +116,7 @@ export const generateDocs = (
     functional_sections?: Record<string, SectionDefinition>;
   },
   onEvent: (ev: Record<string, unknown>) => void,
-  onDone: () => void,
+  onDone: (result: Record<string, unknown>) => void,
   onError: (msg: string) => void,
 ): AbortController => {
   const ctrl = new AbortController();
@@ -158,13 +158,13 @@ export const generateDocs = (
           try {
             const ev = JSON.parse(line.slice(6));
             onEvent(ev);
-            if (ev.event === 'done') { onDone(); return; }
+            if (ev.event === 'done') { onDone(ev.result ?? {}); return; }
             if (ev.event === 'error') { onError(ev.message ?? 'Generation error'); return; }
           } catch { /* ignore malformed */ }
         }
       }
     }
-    onDone();
+    onDone({});
   };
 
   doFetch();

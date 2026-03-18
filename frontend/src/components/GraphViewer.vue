@@ -20,6 +20,14 @@
     </div>
 
     <div v-else class="groups-scroll">
+      <!-- Legend -->
+      <div class="graph-legend">
+        <span class="legend-item"><span class="legend-dot legend-module"></span>Module</span>
+        <span class="legend-item"><span class="legend-dot legend-class"></span>Class</span>
+        <span class="legend-item"><span class="legend-dot legend-function"></span>Function</span>
+        <span class="legend-item"><span class="legend-dot legend-default"></span>Other</span>
+      </div>
+
       <!-- General: all nodes -->
       <div class="group-section">
         <div class="group-header" @click="toggleGroup('__all__')">
@@ -368,6 +376,23 @@ onBeforeUnmount(() => { cyInstances.forEach((c) => c.destroy()); cyInstances.cle
 
 .cy-group-container { width: 100%; background: #080c12; }
 
+.graph-legend {
+  display: flex; align-items: center; gap: 14px;
+  padding: 6px 12px; background: #0a0e17; border-bottom: 1px solid #1f2937;
+  position: sticky; top: 0; z-index: 1;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: #6b7280; font-family: 'JetBrains Mono', monospace;
+}
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%; border-width: 1.5px; border-style: solid; flex-shrink: 0;
+}
+.legend-module   { background: #0d4f4a; border-color: #14b8a6; }
+.legend-class    { background: #312e6e; border-color: #6366f1; }
+.legend-function { background: #1c2f20; border-color: #4ade80; }
+.legend-default  { background: #1e3a4a; border-color: #2d6a7a; }
+
 .node-detail {
   padding: 8px 12px; background: #111827; border-top: 1px solid #1f2937;
   font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
@@ -393,6 +418,12 @@ onBeforeUnmount(() => { cyInstances.forEach((c) => c.destroy()); cyInstances.cle
 .v-theme--light .group-name { color: #0f172a; }
 .v-theme--light .group-meta { color: #94a3b8; }
 .v-theme--light .cy-group-container { background: #f8fafc; }
+.v-theme--light .graph-legend { background: #ffffff; border-bottom-color: #e2e8f0; }
+.v-theme--light .legend-item { color: #94a3b8; }
+.v-theme--light .legend-module   { background: #99f6e4; border-color: #0d9488; }
+.v-theme--light .legend-class    { background: #c7d2fe; border-color: #6366f1; }
+.v-theme--light .legend-function { background: #bbf7d0; border-color: #16a34a; }
+.v-theme--light .legend-default  { background: #cbd5e1; border-color: #94a3b8; }
 .v-theme--light .node-detail { background: #f1f5f9; border-top-color: #e2e8f0; }
 .v-theme--light .nd-path { color: #0f766e; }
 .v-theme--light .nd-type { color: #64748b; }

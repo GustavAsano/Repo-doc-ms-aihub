@@ -204,8 +204,8 @@ function onRepoLoaded() {
   activeTab.value = 'graph';
 }
 
-watch(() => store.hasActiveDocs, (v) => {
-  if (v) activeTab.value = 'run';
+watch(() => store.docsUrl, (v: string) => {
+  if (v) activeTab.value = 'docs';
 });
 
 // Load library on mount
