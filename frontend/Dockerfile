@@ -12,9 +12,12 @@ ENV VITE_APP_API_KEY=$VITE_APP_API_KEY
 ENV VITE_APP_BACKEND_API_BASE=$VITE_APP_BACKEND_API_BASE
 
 WORKDIR /app
+# Install deps in their own layer so source changes don't re-trigger install
+COPY package.json bun.lockb ./
+RUN bun install
 COPY . .
-RUN bun install 
-RUN bun run build
+# Skip vue-tsc type-check here (memory-heavy); run `bun run build` locally/CI for type errors
+RUN bunx vite build
 
 # ---- Serve stage ----
 FROM nginx:alpine

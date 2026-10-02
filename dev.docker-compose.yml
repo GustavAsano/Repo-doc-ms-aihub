@@ -1,11 +1,11 @@
 services:
 
   # API
-  example-backend:
-    image: example-backend-dev
+  repo-doc-backend:
+    image: repo-doc-backend-dev
     extends:
       file: docker-compose.yml
-      service: example-backend
+      service: repo-doc-backend
     build:
       context: ./backend
       dockerfile: dev.Dockerfile
@@ -17,13 +17,13 @@ services:
     environment:
       - BACKEND_DEBUG=true
     ports:
-      - 8000:8000
+      - "127.0.0.1:8000:8000"
   # Frontend
-  example-ui:
-    image: example-ui-dev
+  repo-doc-ui:
+    image: repo-doc-ui-dev
     extends:
       file: docker-compose.yml
-      service: example-ui
+      service: repo-doc-ui
     build:
       context: ./frontend
       dockerfile: dev.Dockerfile
@@ -34,4 +34,7 @@ services:
       - 'VITE_APP_BACKEND_PORT=8000'
       - 'VITE_APP_API_KEY=${API_KEY}'
     ports:
-      - 3000:3000
+      - "127.0.0.1:${UI_PORT:-3001}:3000"
+
+volumes:
+  repo-doc-data:

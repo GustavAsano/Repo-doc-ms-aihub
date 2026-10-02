@@ -151,15 +151,23 @@ async function generate() {
       if (store.repoState) {
         store.repoState.docs_generated = true;
       }
-      // Fetch docs server URL — use the backend proxy path so the iframe
-      // works inside Docker (browser can't reach 127.0.0.1:<container-port>)
-      try {
-        const srv = await getDocsServer();
-        store.mkdocsPort = srv.port;
-        // Always route through the backend proxy: /docs/preview/
-        store.docsUrl = '/docs/preview/';
-      } catch { /* not critical */ }
       toast.success('Documentation generated!');
+      // MkDocs may still be starting — retry until it's ready (up to ~20s)
+      const maxRetries = 13;
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const srv = await getDocsServer();
+          store.mkdocsPort = srv.port;
+          store.docsUrl = '/docs/preview/';
+          break;
+        } catch {
+          if (i < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 1500));
+          } else {
+            toast.warning('Documentation site could not start. Try refreshing the Docs tab.');
+          }
+        }
+      }
     },
     (msg) => {
       store.generating = false;
