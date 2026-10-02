@@ -251,8 +251,10 @@ def generate_mkdocs_config(
     repo_url: str | None = None,
     author: str | None = None,
     site_language: str | None = None,
+    doc_variant: str = "technical",
 ):
-    docs_dir = project_root / "docs"
+    docs_folder = "docs_functional" if doc_variant == "functional" else "docs"
+    docs_dir = project_root / docs_folder
     docs_dir.mkdir(exist_ok=True)
 
     create_index_md(docs_dir, repo_name)
@@ -271,10 +273,10 @@ def generate_mkdocs_config(
 
     mkdocs_config = {
         "site_name": f"{repo_name} Documentation",
-        "site_description": f"Technical documentation for the {repo_name} repository",
+        "site_description": f"{doc_variant.title()} documentation for the {repo_name} repository",
         "site_author": author or "Unknown",
         "repo_name": repo_name,
-        "docs_dir": "docs",
+        "docs_dir": docs_folder,
         "site_dir": "site",
         "use_directory_urls": False,
         "theme": {
@@ -390,6 +392,7 @@ def _stop_mkdocs_process() -> None:
                 proc.wait(timeout=2)
             except Exception:
                 proc.kill()
+                proc.wait(timeout=2)
     except Exception:
         pass
     _MKDOCS_PROCESS = None
@@ -400,6 +403,7 @@ def serve_mkdocs(
     project_root: Path,
     port: int | None = None,
     force_restart: bool = False,
+    startup_timeout: float = 30.0,
 ) -> tuple[int | None, str | None]:
     global _MKDOCS_PROCESS, _MKDOCS_PORT
 
@@ -437,15 +441,24 @@ def serve_mkdocs(
             env=env,
         )
 
-    # espera curta para detectar falha imediata
-    time.sleep(1.5)
-    if proc.poll() is not None:
+    # Building the selected site can take longer than a fixed startup sleep.
+    # Return only once MkDocs has bound its HTTP port, or report a real failure.
+    deadline = time.monotonic() + startup_timeout
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            try:
+                return None, log_path.read_text(encoding="utf-8")
+            except Exception:
+                return None, "mkdocs failed to start. Check mkdocs_serve.log"
         try:
-            return None, log_path.read_text(encoding="utf-8")
-        except Exception:
-            return None, "mkdocs failed to start. Check mkdocs_serve.log"
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                _MKDOCS_PROCESS = proc
+                _MKDOCS_PORT = port
+                return port, None
+        except OSError:
+            time.sleep(0.1)
 
     _MKDOCS_PROCESS = proc
     _MKDOCS_PORT = port
-    return port, None
-
+    _stop_mkdocs_process()
+    return None, f"MkDocs did not become ready within {startup_timeout:g} seconds. Check mkdocs_serve.log"

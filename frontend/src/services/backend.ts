@@ -163,6 +163,11 @@ export const generateDocs = (
           } catch { /* ignore malformed */ }
         }
       }
+      buf += decoder.decode();
+      if (processLine(buf)) return;
+      onError('Generation stream ended before completion.');
+    } catch (e: unknown) {
+      if ((e as Error).name !== 'AbortError') onError(String(e));
     }
     onDone({});
   };
@@ -173,8 +178,17 @@ export const generateDocs = (
 
 // ─── Docs server ───────────────────────────────────────────────────────────
 
-export const getDocsServer = async (): Promise<{ port: number; docs_url: string; entry_html: string }> => {
+export const getDocsServer = async (): Promise<{ port: number; docs_url: string; entry_html: string; preview_url: string }> => {
   const { data } = await axios.get(getEndpoint('/docs/server'), { headers: headers() });
+  return data;
+};
+
+export const selectDocVariant = async (
+  repoName: string, docVariant: 'technical' | 'functional', language: Language,
+): Promise<{ port: number; entry_html: string; preview_url: string }> => {
+  const { data } = await axios.post(getEndpoint('/docs/variant'), {
+    repo_name: repoName, doc_variant: docVariant, language,
+  }, { headers: headers() });
   return data;
 };
 

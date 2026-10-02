@@ -87,9 +87,9 @@ function b64toBlob(b64: string, type: string): Blob {
   font-family: 'JetBrains Mono', monospace; transition: all 0.15s;
   display: flex; align-items: center; justify-content: center;
 }
-.export-btn:hover:not(:disabled) { border-color: #6b7280; color: #e5e7eb; }
+.export-btn:hover:not(:disabled) { border-color: rgb(var(--v-theme-subtle)); color: rgb(var(--v-theme-text)); }
 .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.export-btn.pdf:hover:not(:disabled) { border-color: #ef4444; color: #fca5a5; }
-.export-btn.word:hover:not(:disabled) { border-color: #3b82f6; color: #93c5fd; }
+.export-btn.pdf:hover:not(:disabled) { border-color: rgb(var(--v-theme-error-strong)); color: rgb(var(--v-theme-error-light)); }
+.export-btn.word:hover:not(:disabled) { border-color: rgb(var(--v-theme-info)); color: rgb(var(--v-theme-info-light)); }
 .export-btn.loading { opacity: 0.7; cursor: wait; }
 </style>

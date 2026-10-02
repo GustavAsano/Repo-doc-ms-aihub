@@ -328,7 +328,7 @@ def snapshot_repo_assets(
 
     try:
         repo_dir.mkdir(parents=True, exist_ok=True)
-        if code_json_path.exists():
+        if code_json_path.exists() and code_json_path.resolve() != (repo_dir / "code.json").resolve():
             shutil.copy2(code_json_path, repo_dir / "code.json")
 
         docs_dst = repo_dir / "docs"
@@ -356,7 +356,8 @@ def snapshot_repo_assets(
 
         if graph_path and Path(graph_path).exists():
             graph_dst = repo_dir / "graph.json"
-            shutil.copy2(graph_path, graph_dst)
+            if Path(graph_path).resolve() != graph_dst.resolve():
+                shutil.copy2(graph_path, graph_dst)
             payload["library_graph_json"] = str(graph_dst)
     except Exception as exc:
         print(f"[state] snapshot_repo_assets error: {exc}")
@@ -399,12 +400,13 @@ def snapshot_functional_assets(
             payload["functional_docs_available"] = bool(payload["functional_docs_available"] or fmd_dst.exists())
         payload["docs_available"] = bool(payload["functional_docs_available"])
 
-        if code_json_path and code_json_path.exists():
+        if code_json_path and code_json_path.exists() and code_json_path.resolve() != (repo_dir / "code.json").resolve():
             shutil.copy2(code_json_path, repo_dir / "code.json")
 
         if graph_path and Path(graph_path).exists():
             graph_dst = repo_dir / "graph.json"
-            shutil.copy2(graph_path, graph_dst)
+            if Path(graph_path).resolve() != graph_dst.resolve():
+                shutil.copy2(graph_path, graph_dst)
             payload["library_graph_json"] = str(graph_dst)
     except Exception as exc:
         print(f"[state] snapshot_functional_assets error: {exc}")
@@ -425,49 +427,30 @@ def activate_repo_assets(entry: dict, doc_variant: str = "technical") -> bool:
         except Exception:
             return None
 
-    if variant == "functional":
-        docs_src = _p(entry.get("library_functional_docs_dir"))
-        md_src = _p(entry.get("library_functional_documentation_md"))
-    else:
-        docs_src = _p(entry.get("library_docs_dir"))
-        md_src = _p(entry.get("library_documentation_md"))
-
-    docs_dst = WORKSPACE_DIR / "docs"
-    md_dst = WORKSPACE_DIR / "documentation.md"
-    restored = False
-
+    reset_workspace()
+    ensure_workspace()
+    sources = {
+        "technical": ("library_docs_dir", "library_documentation_md", "docs", "documentation.md"),
+        "functional": ("library_functional_docs_dir", "library_functional_documentation_md",
+                       "docs_functional", "functional_documentation.md"),
+    }
+    restored = {}
     try:
-        if docs_dst.exists():
-            shutil.rmtree(docs_dst)
-        if docs_src and docs_src.exists():
-            shutil.copytree(docs_src, docs_dst)
-            restored = True
-        if md_dst.exists():
-            md_dst.unlink()
-        if md_src and md_src.exists():
-            shutil.copy2(md_src, md_dst)
+        for kind, (docs_key, md_key, docs_name, md_name) in sources.items():
+            docs_src = _p(entry.get(docs_key))
+            md_src = _p(entry.get(md_key))
+            # Functional-only library entries use library_docs_dir for functional pages.
+            if kind == "technical" and docs_src == _p(entry.get("library_functional_docs_dir")):
+                continue
+            if docs_src and docs_src.is_dir():
+                shutil.copytree(docs_src, WORKSPACE_DIR / docs_name)
+                restored[kind] = any((WORKSPACE_DIR / docs_name).glob("*.md"))
+            if md_src and md_src.is_file():
+                shutil.copy2(md_src, WORKSPACE_DIR / md_name)
     except Exception as exc:
         print(f"[state] activate_repo_assets error: {exc}")
         return False
-
-    # Optional functional sidecar sync
-    func_docs_src = _p(entry.get("library_functional_docs_dir"))
-    func_md_src = _p(entry.get("library_functional_documentation_md"))
-    func_docs_dst = WORKSPACE_DIR / "docs_functional"
-    func_md_dst = WORKSPACE_DIR / "functional_documentation.md"
-    try:
-        if func_docs_src and func_docs_src.exists():
-            if func_docs_dst.exists():
-                shutil.rmtree(func_docs_dst)
-            shutil.copytree(func_docs_src, func_docs_dst)
-        if func_md_src and func_md_src.exists():
-            if func_md_dst.exists():
-                func_md_dst.unlink()
-            shutil.copy2(func_md_src, func_md_dst)
-    except Exception:
-        pass
-
-    return restored
+    return bool(restored.get(variant))
 
 
 # ---------------------------------------------------------------------------

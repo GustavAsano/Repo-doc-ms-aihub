@@ -1,72 +1,43 @@
-#!/bin/bash
-
-# Change to script directory
+#!/usr/bin/env bash
+set -euo pipefail
 cd "$(dirname "$0")"
-echo "heheeeeeeeee $(dirname "$0")"
-# Check if docker compose is installed
-if ! command -v docker &> /dev/null
-then
-    echo "Docker could not be found. Please install Docker and try again."
-    cd - > /dev/null && exit 1
+command -v docker >/dev/null || { echo "Docker nao encontrado." >&2; exit 1; }
+docker compose version >/dev/null
+
+# Cria .env.secrets com template se nao existir ou estiver vazio
+if [[ ! -f .env.secrets ]] || [[ ! -s .env.secrets ]]; then
+  cat > .env.secrets << 'EOF'
+# =============================================================================
+# .env.secrets — credenciais e configurações locais (nunca vai ao git)
+# Preencha apenas as variáveis do provedor LLM que for usar.
+# =============================================================================
+
+# AWS Bedrock (deixe vazios se usar role IAM da EC2)
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_SESSION_TOKEN=
+AWS_REGION=us-east-1
+BEDROCK_REGION=us-east-1
+
+# Google Gemini — https://aistudio.google.com/app/apikey
+GOOGLE_API_KEY=
+
+# OpenAI — https://platform.openai.com/api-keys
+OPENAI_API_KEY=
+
+# Chave que protege os endpoints do backend (qualquer string aleatória)
+API_KEY=
+
+# Porta do frontend no host (default: 3001)
+UI_PORT=3001
+EOF
+  echo "Arquivo .env.secrets criado com template. Preencha as variaveis antes de continuar." >&2
+  exit 1
 fi
-
-# Parse command line arguments for model value
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --dev) dev="true"; shift ;;
-        --down) down="true"; shift ;;
-        *) echo "Unknown parameter passed: $1"; cd - > /dev/null && exit 1 ;;
-    esac
-done
-
-# Stop potentially running containers
-echo "Stopping containers..."
-docker compose down --remove-orphans 2> /dev/null
-
-# Check if down flag is set (nothind else to do)
-if [ "$down" = "true" ]
-then
-    cd - > /dev/null && exit
-fi
-
-# Create cache directory
-mkdir -p backend/data/cache
-
-# Check for ssh keys
-# if [ ! -f ~/.ssh/id_rsa ] || [ ! -f ~/.ssh/config ]
-# then
-#     echo "SSH key and configuration not found in ~/.ssh. Please add an SSH key that can access genms-proxy git repository."
-#     cd - > /dev/null && exit 1
-# fi
-# export SSH_CONFIG=$(cat ~/.ssh/config)
-# export SSH_PRIVATE_KEY=$(cat ~/.ssh/id_rsa)
-
-# Check secrets file is present
-if [ ! -f ".env.secrets" ]
-then
-    echo ".env.secrets not found. Please create .env.secrets and try again."
-    echo "See .env.default_secrets for an example configuration."
-    echo "Be mindful of not committing .env.secrets to version control."
-    cd - > /dev/null && exit 1
-fi
-
-# Choose deployment type
-env_file_arg="--env-file .env.secrets_defaults --env-file .env.secrets --env-file .env.defaults"
-
-# Run docker compose
-if [ "$dev" = "true" ]
-then
-    echo "Running in development mode."
-    command="docker compose $env_file_arg -f dev.docker-compose.yml up --build --remove-orphans"
-    echo "$command"
-    eval $command
-    cd - > /dev/null && exit
-else
-    echo "Running in production mode."
-    command="docker compose $env_file_arg up --build --remove-orphans -d"
-    echo "$command"
-    eval $command
-    echo "Showing logs (stop reading with Ctrl + C)..."
-    docker compose logs -f
-    cd - > /dev/null && exit
-fi
+compose=(docker compose --env-file .env.secrets)
+case "${1:-}" in
+  --down) "${compose[@]}" down ;;
+  --dev) "${compose[@]}" -f dev.docker-compose.yml up --build ;;
+  "") "${compose[@]}" up --build -d ;;
+  *) echo "Uso: $0 [--dev|--down]" >&2; exit 1 ;;
+esac

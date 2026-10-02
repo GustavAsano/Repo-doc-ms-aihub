@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import yaml
 import uuid
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
@@ -35,7 +36,7 @@ from app.core.state import (
     upsert_functional_library_entry,
     upsert_library_entry,
 )
-from app.schemas.repo_doc import GenerateDocRequest, GenerateFromLibraryRequest, RepoStateResponse
+from app.schemas.repo_doc import DocVariantRequest, GenerateDocRequest, GenerateFromLibraryRequest, RepoStateResponse
 
 router = APIRouter(prefix="/docs", tags=["Documentation"])
 
@@ -56,10 +57,11 @@ def _sections_dict(sections: Optional[dict]) -> Optional[dict[str, dict]]:
     """Convert SectionDefinition objects to plain dicts if needed."""
     if not sections:
         return None
-    return {k: (v.dict() if hasattr(v, "dict") else dict(v)) for k, v in sections.items()}
+    return {k: (v.model_dump() if hasattr(v, "model_dump") else dict(v)) for k, v in sections.items()}
 
 
-def _start_mkdocs(repo_name: str, repo_url: Optional[str] = None, author: Optional[str] = None) -> Optional[int]:
+def _start_mkdocs(repo_name: str, repo_url: Optional[str] = None, author: Optional[str] = None,
+                  doc_variant: str = "technical", language: str = "EN-US") -> Optional[int]:
     from app.src.mkdocs_ui import generate_mkdocs_config, serve_mkdocs
 
     generate_mkdocs_config(
@@ -67,7 +69,10 @@ def _start_mkdocs(repo_name: str, repo_url: Optional[str] = None, author: Option
         repo_name=repo_name,
         repo_url=repo_url,
         author=author,
+        doc_variant=doc_variant,
+        site_language=language,
     )
+    set_mkdocs_port(None)
     port, err = serve_mkdocs(WORKSPACE_DIR, port=None, force_restart=True)
     if err:
         print(f"[docs] MkDocs error: {err}")
@@ -130,21 +135,41 @@ async def _run_in_thread(fn, *args, **kwargs):
     return await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
 
 
-def _make_progress_queue_callback(queue: asyncio.Queue):
-    """Returns a synchronous callback that the doc_gen functions can call,
-    which safely puts events onto the asyncio queue from a thread."""
-    # Capture the running loop at factory time (we're in an async context here).
-    # Calling asyncio.get_event_loop() from inside the worker thread fails in
-    # Python 3.10+ when the thread has no loop of its own.
-    loop = asyncio.get_event_loop()
+class GenerationProgress:
+    """Aggregate sequential LLM stages; only the API can finish the SSE stream."""
 
-    def callback(event: dict):
-        try:
-            asyncio.run_coroutine_threadsafe(queue.put(event), loop)
-        except Exception as exc:
-            print(f"[docs] progress callback error: {exc}")
+    def __init__(self, queue: asyncio.Queue):
+        self.queue = queue
+        self.loop = asyncio.get_running_loop()
+        self.completed_calls = 0
+        self.completed_cost = 0.0
+        self.total_cost = 0.0
+        self.cost_available = False
 
-    return callback
+    def stage_callback(self, variant: str):
+        calls_offset = self.completed_calls
+        cost_offset = self.completed_cost
+
+        def callback(event: dict):
+            payload = dict(event)
+            payload["doc_variant"] = variant
+            local_calls = int(payload.get("current_call") or 0)
+            if "current_call" in payload:
+                payload["current_call"] = calls_offset + local_calls
+            if "total_calls" in payload:
+                payload["total_calls"] = calls_offset + int(payload["total_calls"])
+            if "total_cost_usd" in payload:
+                self.total_cost = cost_offset + float(payload["total_cost_usd"] or 0)
+                payload["total_cost_usd"] = self.total_cost
+            self.cost_available |= bool(payload.get("cost_available"))
+            if payload.get("event") == "done":
+                self.completed_calls = calls_offset + local_calls
+                self.completed_cost = self.total_cost
+                payload["event"] = "phase_done"
+                payload["total_calls"] = self.completed_calls
+            self.loop.call_soon_threadsafe(self.queue.put_nowait, payload)
+
+        return callback
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +183,7 @@ async def generate_docs(body: GenerateDocRequest):
     Streams Server-Sent Events with progress updates while generating documentation.
 
     Event shape:
-      { "event": "plan"|"call_start"|"call_end"|"done"|"error",
+      { "event": "plan"|"call_start"|"call_end"|"phase_done"|"done"|"error",
         "phase": str, "current_call": int, "total_calls": int, "message": str,
         "result": {...} }   <- only on "done"
 
@@ -172,6 +197,9 @@ async def generate_docs(body: GenerateDocRequest):
     normalized_lang = _normalize_language(body.language)
     mode = body.generation_mode.lower().replace("-", "_").replace(" ", "_")
 
+    if mode not in {GEN_TECHNICAL_ONLY, GEN_TECHNICAL_AND_FUNCTIONAL, GEN_FUNCTIONAL_ONLY}:
+        raise HTTPException(status_code=422, detail="Invalid generation mode.")
+
     # Locate code.json
     code_json_path = resolve_code_json(body.repo_name, preferred_language=normalized_lang)
     if code_json_path is None:
@@ -183,6 +211,8 @@ async def generate_docs(body: GenerateDocRequest):
     # LLM credentials
     api_key = "" if body.use_system_key else (body.api_key or "")
 
+    reset_workspace()
+
     async def event_stream() -> AsyncGenerator[str, None]:
         from app.src.doc_gen import (
             generate_doc,
@@ -192,7 +222,7 @@ async def generate_docs(body: GenerateDocRequest):
         )
 
         queue: asyncio.Queue = asyncio.Queue()
-        progress_cb = _make_progress_queue_callback(queue)
+        progress = GenerationProgress(queue)
         final_result: dict[str, Any] = {}
         error_msg: Optional[str] = None
 
@@ -214,7 +244,7 @@ async def generate_docs(body: GenerateDocRequest):
                         model_name=body.model,
                         api_key=api_key,
                         use_system_key=body.use_system_key,
-                        progress_callback=progress_cb,
+                        progress_callback=progress.stage_callback("technical"),
                         documentation_sections=tech_sections,
                     )
                     await _run_in_thread(
@@ -235,7 +265,7 @@ async def generate_docs(body: GenerateDocRequest):
                         model_name=body.model,
                         api_key=api_key,
                         use_system_key=body.use_system_key,
-                        progress_callback=progress_cb,
+                        progress_callback=progress.stage_callback("functional"),
                         functional_sections=func_sections,
                         checkpoint_path=functional_checkpoint,
                     )
@@ -258,7 +288,7 @@ async def generate_docs(body: GenerateDocRequest):
                         model_name=body.model,
                         api_key=api_key,
                         use_system_key=body.use_system_key,
-                        progress_callback=progress_cb,
+                        progress_callback=progress.stage_callback("functional"),
                         functional_sections=func_sections,
                         checkpoint_path=str(OUT_DIR / body.repo_name / "functional_code_doc_gen_resume.json"),
                     )
@@ -320,6 +350,7 @@ async def generate_docs(body: GenerateDocRequest):
                     "language": normalized_lang,
                     "docs_available": bool(snap.get("docs_available")),
                     "functional_docs_available": bool(snap.get("functional_docs_available")),
+                    "generation_mode": mode,
                 },
                 language=normalized_lang,
             )
@@ -337,21 +368,18 @@ async def generate_docs(body: GenerateDocRequest):
                     **source_entry,
                     **fsnap,
                     "language": normalized_lang,
+                    "generation_mode": mode,
                 },
                 language=normalized_lang,
             )
 
-        # Start MkDocs
+        doc_variant = "functional" if functional_docs_generated and not docs_generated else "technical"
         port = _start_mkdocs(
             body.repo_name,
             repo_url=source_entry.get("repo_url"),
             author=source_entry.get("owner"),
-        )
-
-        doc_variant = (
-            "functional"
-            if functional_docs_generated and not docs_generated
-            else "technical"
+            doc_variant=doc_variant,
+            language=normalized_lang,
         )
 
         state = RepoStateResponse(
@@ -359,7 +387,7 @@ async def generate_docs(body: GenerateDocRequest):
             language=normalized_lang,
             output_dir=str(code_json_path.parent),
             graph_path=graph_path,
-            docs_generated=bool(docs_generated or functional_docs_generated),
+            docs_generated=docs_generated,
             functional_docs_generated=functional_docs_generated,
             docs_skipped=False,
             doc_variant=doc_variant,
@@ -367,7 +395,12 @@ async def generate_docs(body: GenerateDocRequest):
             mkdocs_port=port,
         )
 
-        yield await _sse_event({"event": "done", "result": state.dict()})
+        yield await _sse_event({
+            "event": "done", "result": state.model_dump(),
+            "current_call": progress.completed_calls, "total_calls": progress.completed_calls,
+            "total_cost_usd": progress.total_cost, "cost_available": progress.cost_available,
+            "phase": "done",
+        })
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -449,7 +482,8 @@ async def load_from_library(body: GenerateFromLibraryRequest):
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Translation failed: {exc}")
 
-    port = _start_mkdocs(repo_name, repo_url=resolved.get("repo_url"), author=resolved.get("owner"))
+    port = _start_mkdocs(repo_name, repo_url=resolved.get("repo_url"), author=resolved.get("owner"),
+                         doc_variant=doc_variant, language=target_lang if body.translate_on_load else source_lang)
     graph_path = resolved.get("library_graph_json") or ""
     code_json = Path(resolved.get("library_code_json") or "")
 
@@ -460,7 +494,7 @@ async def load_from_library(body: GenerateFromLibraryRequest):
         language=target_lang if body.translate_on_load else source_lang,
         output_dir=str(code_json.parent) if code_json.exists() else None,
         graph_path=graph_path if Path(graph_path).exists() else None,
-        docs_generated=docs_ok,
+        docs_generated=bool((WORKSPACE_DIR / "documentation.md").is_file()),
         functional_docs_generated=bool(resolved.get("functional_docs_available")),
         docs_skipped=not docs_ok,
         doc_variant=doc_variant,
@@ -468,6 +502,20 @@ async def load_from_library(body: GenerateFromLibraryRequest):
         mkdocs_port=port,
         library_entry_key=body.entry_key,
     )
+
+
+@router.post("/variant", summary="Select technical or functional documentation for preview")
+async def select_doc_variant(body: DocVariantRequest):
+    folder = "docs_functional" if body.doc_variant == "functional" else "docs"
+    docs_dir = WORKSPACE_DIR / folder
+    if not docs_dir.exists() or not any(p.read_text(encoding="utf-8").strip() for p in docs_dir.glob("*.md")):
+        raise HTTPException(status_code=404, detail=f"No {body.doc_variant} documentation available.")
+    port = await _run_in_thread(
+        _start_mkdocs, body.repo_name, doc_variant=body.doc_variant, language=body.language,
+    )
+    if not port:
+        raise HTTPException(status_code=503, detail="Documentation server could not start.")
+    return await get_docs_server()
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +532,9 @@ async def get_docs_server():
     if not port or not is_port_open(port):
         return JSONResponse(status_code=503, content={"error": "Documentation server is not running."})
 
-    docs_dir = WORKSPACE_DIR / "docs"
+    config_path = WORKSPACE_DIR / "mkdocs.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    docs_dir = WORKSPACE_DIR / (config or {}).get("docs_dir", "docs")
     try:
         entry_html = _resolve_docs_entry_html(docs_dir)
     except Exception:
@@ -492,7 +542,8 @@ async def get_docs_server():
 
     nonce = uuid.uuid4().hex
     docs_url = f"http://127.0.0.1:{port}/{entry_html}?v={nonce}"
-    return {"port": port, "docs_url": docs_url, "entry_html": entry_html}
+    return {"port": port, "docs_url": docs_url, "entry_html": entry_html,
+            "preview_url": f"/docs/preview/{entry_html}"}
 
 
 # ---------------------------------------------------------------------------

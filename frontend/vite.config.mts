@@ -24,7 +24,7 @@ export default defineConfig({
       google: {
         families: [
           { name: "Syne", styles: "wght@700;800" },
-          { name: "JetBrains+Mono", styles: "wght@400;500;600" },
+          { name: "JetBrains+Mono", styles: "wght@400;500;600;700" },
         ],
       },
     }),

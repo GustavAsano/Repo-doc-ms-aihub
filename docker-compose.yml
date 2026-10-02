@@ -14,7 +14,9 @@ services:
       - APP_DATA_DIR=/app/data
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
       - AWS_REGION=${AWS_REGION:-us-east-1}
+      - BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - API_KEY=${API_KEY}
@@ -41,7 +43,7 @@ services:
       - 'VITE_APP_BACKEND_PORT='
       - 'VITE_APP_API_KEY=${API_KEY}'
     ports:
-      - 3000:3000
+      - "127.0.0.1:${UI_PORT:-3001}:3000"
     depends_on:
       - repo-doc-backend
 

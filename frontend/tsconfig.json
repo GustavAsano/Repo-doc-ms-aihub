@@ -10,11 +10,10 @@
     "target": "ESNext",
     "jsx": "preserve",
     "lib": ["DOM", "ESNext"],
-    "baseUrl": "./",
     "module": "ESNext",
-    "moduleResolution": "Node10",
+    "moduleResolution": "Bundler",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "resolveJsonModule": true,
     "types": ["vite/client", "vite-plugin-vue-layouts/client"],

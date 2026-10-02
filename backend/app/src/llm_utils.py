@@ -22,6 +22,8 @@ PROVIDER_ENV_VARS = {
     "gemini": "GOOGLE_API_KEY",
     "openai": "OPENAI_API_KEY",
 }
+# Bedrock models that reject the temperature field (matched as substring of model ID).
+BEDROCK_NO_TEMPERATURE_MODELS = ("openai.gpt-6-luna",)
 BEDROCK_INFERENCE_PROFILE_FALLBACKS = {
     # Foundation model IDs that require inference profile in Bedrock.
     BEDROCK_HAIKU_45_MODEL_ID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -204,7 +206,7 @@ def init_llm(
     model_name: str,
     api_key: Optional[str] = None,
     use_system_key: bool = True,
-    temperature: float = 0.0,
+    temperature: Optional[float] = 0.0,
 ):
     provider = normalize_provider(provider)
     if provider == "bedrock":
@@ -235,6 +237,9 @@ def init_llm(
             str(os.getenv("AWS_BEDROCK_RUNTIME_ENDPOINT") or "").strip()
             or f"https://bedrock-runtime.{bedrock_region}.amazonaws.com"
         )
+        if any(m in model_id for m in BEDROCK_NO_TEMPERATURE_MODELS):
+            # None makes LiteLLM omit the field from the request.
+            temperature = None
         bedrock_model_kwargs = {
             "aws_region_name": bedrock_region,
             "aws_bedrock_runtime_endpoint": bedrock_runtime_endpoint,

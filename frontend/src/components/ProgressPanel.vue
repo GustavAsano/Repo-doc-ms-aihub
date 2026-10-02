@@ -17,12 +17,12 @@
       <div
         class="prog-bar-fill"
         :style="{ width: barPct + '%', transition: 'width 0.4s ease' }"
-        :class="{ done: !store.generating && store.repoState?.docs_generated }"
+        :class="{ done: !store.generating && store.hasActiveDocs }"
       ></div>
     </div>
     <div class="prog-counts">
       <span v-if="store.progressTotal > 0">
-        {{ store.progressCurrent }} / {{ store.progressTotal }} LLM calls
+        {{ store.progressCurrent }} / {{ store.generating ? '~' : '' }}{{ store.progressTotal }} LLM calls
       </span>
       <span v-if="store.progressPhase" class="prog-phase">{{ store.progressPhase }}</span>
     </div>
@@ -81,7 +81,7 @@ const canGenerate = computed(() =>
 );
 
 const barPct = computed(() => {
-  if (!store.generating && store.repoState?.docs_generated) return 100;
+  if (!store.generating && store.hasActiveDocs) return 100;
   if (store.progressTotal === 0) return 0;
   return Math.min(99, Math.round((store.progressCurrent / store.progressTotal) * 100));
 });
@@ -95,7 +95,7 @@ function sectionLabel(ev: Record<string, unknown>): string {
   const section = ev.section != null ? String(ev.section).toUpperCase() : null;
   const sidx = ev.section_index != null ? ev.section_index : null;
   const stotal = ev.total_sections != null ? ev.total_sections : null;
-  const isFunctional = phase.startsWith('functional_');
+  const isFunctional = ev.doc_variant === 'functional' || phase.startsWith('functional_');
   const typePrefix = isFunctional ? 'Functional · ' : '';
   if (section && sidx != null && stotal != null)
     return `${typePrefix}Writing ${section} (${sidx}/${stotal})`;
@@ -111,7 +111,8 @@ function sectionLabel(ev: Record<string, unknown>): string {
 }
 
 function eventLabel(ev: Record<string, unknown>) {
-  if (ev.event === 'plan') return `Plan: ${ev.total_calls} calls`;
+  if (ev.event === 'plan') return `${ev.doc_variant === 'functional' ? 'Functional' : 'Technical'} plan: ~${ev.total_calls} total calls`;
+  if (ev.event === 'phase_done') return `${ev.doc_variant === 'functional' ? 'Functional' : 'Technical'} generation complete`;
   if (ev.event === 'call_start') return `[${ev.current_call}/${ev.total_calls}] ${sectionLabel(ev)}`;
   if (ev.event === 'call_end') {
     const cost = ev.call_cost_usd != null ? ` · $${(ev.call_cost_usd as number).toFixed(4)}` : '';
@@ -220,9 +221,9 @@ function cancel() {
 <style scoped>
 .progress-panel { display: flex; flex-direction: column; gap: 12px; }
 .prog-header { display: flex; align-items: center; justify-content: space-between; }
-.prog-title { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9ca3af; font-family: 'JetBrains Mono', monospace; }
-.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #374151; flex-shrink: 0; }
-.pulse-dot.active { background: #14b8a6; animation: pulse 1.2s infinite; }
+.prog-title { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgb(var(--v-theme-muted)); font-family: 'JetBrains Mono', monospace; }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--v-theme-border-strong)); flex-shrink: 0; }
+.pulse-dot.active { background: rgb(var(--v-theme-primary)); animation: pulse 1.2s infinite; }
 @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.3); } }
 .cost-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #14b8a6; background: rgba(20,184,166,0.12); padding: 2px 8px; border-radius: 10px; }
 .prog-bar-wrap { height: 4px; background: #1f2937; border-radius: 2px; overflow: hidden; }
@@ -234,29 +235,29 @@ function cancel() {
 .gen-btn-row { display: flex; }
 .gen-btn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 7px 18px; border-radius: 6px; border: 1px solid #14b8a6;
-  background: rgba(20,184,166,0.12); color: #14b8a6;
+  padding: 7px 18px; border-radius: 6px; border: 1px solid rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), 0.12); color: rgb(var(--v-theme-primary));
   font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
   cursor: pointer; transition: background 0.15s, border-color 0.15s;
   letter-spacing: 0.04em;
 }
-.gen-btn:hover:not(:disabled) { background: rgba(20,184,166,0.22); }
+.gen-btn:hover:not(:disabled) { background: rgba(var(--v-theme-primary), 0.22); }
 .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.cancel-btn { border-color: #f87171; background: rgba(248,113,113,0.1); color: #f87171; }
-.cancel-btn:hover { background: rgba(248,113,113,0.2); }
+.cancel-btn { border-color: rgb(var(--v-theme-error)); background: rgba(var(--v-theme-error), 0.1); color: rgb(var(--v-theme-error)); }
+.cancel-btn:hover { background: rgba(var(--v-theme-error), 0.2); }
 .progress-panel { flex: 1; }
 .event-log {
-  flex: 1; min-height: 120px; max-height: 480px; overflow-y: auto; background: #0d1117;
-  border: 1px solid #1f2937; border-radius: 6px; padding: 8px;
+  flex: 1; min-height: 120px; max-height: 480px; overflow-y: auto; background: rgb(var(--v-theme-surface));
+  border: 1px solid rgb(var(--v-theme-border)); border-radius: 6px; padding: 8px;
   display: flex; flex-direction: column; gap: 3px;
 }
-.ev-line { display: flex; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6b7280; }
+.ev-line { display: flex; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgb(var(--v-theme-subtle)); }
 .ev-icon { flex-shrink: 0; width: 14px; text-align: center; }
-.ev-line.plan .ev-msg { color: #818cf8; }
-.ev-line.call_start .ev-msg { color: #9ca3af; }
-.ev-line.call_end .ev-msg { color: #4b5563; }
-.ev-line.done .ev-msg { color: #10b981; font-weight: 600; }
-.ev-line.error .ev-msg { color: #f87171; }
+.ev-line.plan .ev-msg { color: rgb(var(--v-theme-violet)); }
+.ev-line.call_start .ev-msg { color: rgb(var(--v-theme-muted)); }
+.ev-line.call_end .ev-msg { color: rgb(var(--v-theme-disabled)); }
+.ev-line.done .ev-msg { color: rgb(var(--v-theme-success)); font-weight: 600; }
+.ev-line.error .ev-msg { color: rgb(var(--v-theme-error)); }
 </style>
 
 <style>

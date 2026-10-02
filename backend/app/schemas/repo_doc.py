@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -73,6 +73,12 @@ class GenerateDocRequest(BaseModel):
     api_key: Optional[str] = None
     bedrock_access_key: Optional[str] = None
     bedrock_secret_key: Optional[str] = None
+
+
+class DocVariantRequest(BaseModel):
+    repo_name: str
+    doc_variant: Literal["technical", "functional"]
+    language: str = "EN-US"
 
 
 class GenerateFromLibraryRequest(BaseModel):
