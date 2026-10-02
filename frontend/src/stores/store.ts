@@ -56,6 +56,7 @@ export interface AppStore {
   progressTotal: number;
   progressPhase: string;
   progressCost: number | null;
+  progressCostBase: number;
   // Docs server
   docsUrl: string;
   mkdocsPort: number | null;
@@ -103,6 +104,7 @@ export const useAppStore = defineStore('app', {
     progressTotal: 0,
     progressPhase: '',
     progressCost: null,
+    progressCostBase: 0,
     docsUrl: '',
     mkdocsPort: null,
     variantSwitching: false,
@@ -158,13 +160,23 @@ export const useAppStore = defineStore('app', {
       this.progressTotal = 0;
       this.progressPhase = '';
       this.progressCost = null;
+      this.progressCostBase = 0;
     },
     pushProgressEvent(ev: Record<string, unknown>) {
       this.progressEvents.push(ev);
       if (typeof ev.current_call === 'number') this.progressCurrent = ev.current_call;
       if (typeof ev.total_calls === 'number') this.progressTotal = ev.total_calls;
       if (typeof ev.phase === 'string') this.progressPhase = ev.phase;
-      if (typeof ev.total_cost_usd === 'number') this.progressCost = ev.total_cost_usd;
+      if (typeof ev.total_cost_usd === 'number') {
+        // When a new generation pass starts (plan event) and we already have cost
+        // from a previous pass, accumulate it as the base so both costs sum up.
+        if (ev.event === 'plan' && this.progressCost !== null) {
+          this.progressCostBase += this.progressCost;
+          this.progressCost = null;
+        } else {
+          this.progressCost = ev.total_cost_usd;
+        }
+      }
     },
     resetSections() {
       this.techSections = { ...DEFAULT_TECH_SECTIONS };

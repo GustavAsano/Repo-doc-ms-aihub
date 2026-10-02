@@ -69,7 +69,10 @@ watch(() => theme.global.name.value, syncDocumentationTheme);
 function openTab() { window.open(store.docsUrl, '_blank'); }
 function refresh() { bust.value++; iframeLoaded.value = false; }
 
-watch(() => store.docsUrl, () => { iframeLoaded.value = false; });
+watch(() => store.docsUrl, (newVal, oldVal) => {
+  iframeLoaded.value = false;
+  if (newVal && !oldVal) bust.value++;
+});
 </script>
 
 <style scoped>
@@ -90,4 +93,14 @@ watch(() => store.docsUrl, () => { iframeLoaded.value = false; });
 .docs-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgb(var(--v-theme-surface)); }
 .ph-text { font-size: 12px; color: rgb(var(--v-theme-disabled)); font-family: 'JetBrains Mono', monospace; text-align: center; max-width: 260px; }
 .docs-iframe { flex: 1; width: 100%; border: none; background: rgb(var(--v-theme-surface)); }
+</style>
+
+<style>
+.v-theme--light .docs-toolbar { background: #ffffff; border-bottom-color: #e2e8f0; }
+.v-theme--light .docs-label { color: #475569; }
+.v-theme--light .tool-btn { border-color: #e2e8f0; color: #94a3b8; }
+.v-theme--light .tool-btn:hover { border-color: #94a3b8; color: #0f172a; }
+.v-theme--light .port-badge { color: #94a3b8; }
+.v-theme--light .docs-placeholder { background: #f8fafc; }
+.v-theme--light .ph-text { color: #94a3b8; }
 </style>

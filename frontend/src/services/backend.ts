@@ -116,7 +116,7 @@ export const generateDocs = (
     functional_sections?: Record<string, SectionDefinition>;
   },
   onEvent: (ev: Record<string, unknown>) => void,
-  onDone: (result: RepoState) => void,
+  onDone: (result: Record<string, unknown>) => void,
   onError: (msg: string) => void,
 ): AbortController => {
   const ctrl = new AbortController();
@@ -147,31 +147,20 @@ export const generateDocs = (
     const decoder = new TextDecoder();
     let buf = '';
 
-    const processLine = (line: string): boolean => {
-      if (!line.startsWith('data: ')) return false;
-      let ev: Record<string, unknown>;
-      try { ev = JSON.parse(line.slice(6)); } catch { return false; }
-      onEvent(ev);
-      if (ev.event === 'done' && ev.result) {
-        onDone(ev.result as RepoState);
-        return true;
-      }
-      if (ev.event === 'error') {
-        onError(String(ev.message ?? 'Generation error'));
-        return true;
-      }
-      return false;
-    };
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() ?? '';
-        for (const line of lines) {
-          if (processLine(line)) { await reader.cancel(); return; }
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const ev = JSON.parse(line.slice(6));
+            onEvent(ev);
+            if (ev.event === 'done') { onDone(ev.result ?? {}); return; }
+            if (ev.event === 'error') { onError(ev.message ?? 'Generation error'); return; }
+          } catch { /* ignore malformed */ }
         }
       }
       buf += decoder.decode();
@@ -180,6 +169,7 @@ export const generateDocs = (
     } catch (e: unknown) {
       if ((e as Error).name !== 'AbortError') onError(String(e));
     }
+    onDone({});
   };
 
   doFetch();

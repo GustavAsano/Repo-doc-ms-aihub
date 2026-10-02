@@ -16,13 +16,14 @@ export const PROVIDER_MODELS: Record<LLMProvider, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-5-mini', 'gpt-5-nano'],
   bedrock: [
     'moonshotai.kimi-k2.5',
+    'moonshot.kimi-k2-thinking',
     'deepseek.v3.2',
     'zai.glm-5',
     'zai.glm-4.7',
-    'minimax.minimax-m2.5',
-    'openai.gpt-oss-20b-1:0',
-    'us.openai.gpt-6-luna',
-    'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+    'amazon.nova-pro-v1:0',
+    'amazon.nova-2-lite-v1:0',
+    'mistral.devstral-2-123b',
+    'anthropic.claude-haiku-4-5-20251001-v1:0'
   ],
 };
 

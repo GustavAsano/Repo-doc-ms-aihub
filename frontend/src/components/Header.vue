@@ -13,13 +13,12 @@
     </v-app-bar-title>
 
     <v-btn
-      icon="mdi-white-balance-sunny"
+      :icon="theme.global.current.value.dark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
       variant="text"
-      :title="themeToggleLabel"
-      :aria-label="themeToggleLabel"
-      :aria-pressed="theme.global.current.value.dark"
+      class="mr-1"
       @click="toggleTheme"
     />
+
     <v-dialog v-model="infoDialog" max-width="70%">
       <template #activator="{ props: activatorProps }">
         <v-btn prepend-icon="mdi-information-outline" v-bind="activatorProps">Info</v-btn>
@@ -42,17 +41,14 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useTheme } from 'vuetify';
-import { saveTheme } from '@/utils/themePreference';
 
 const infoDialog = ref(false);
 const theme = useTheme();
-const themeToggleLabel = computed(() => theme.global.current.value.dark ? 'Switch to light theme' : 'Switch to dark theme');
+
 function toggleTheme() {
-  const nextTheme = theme.global.current.value.dark ? 'light' : 'dark';
-  theme.global.name.value = nextTheme;
-  saveTheme(nextTheme);
+  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark';
 }
 </script>
 
