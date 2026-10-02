@@ -34,7 +34,7 @@
             label="Use server key"
             density="compact"
             hide-details
-            color="teal"
+            color="primary"
             class="sys-check"
           />
           <v-text-field
@@ -58,7 +58,7 @@
           label="Use instance role / env credentials"
           density="compact"
           hide-details
-          color="teal"
+          color="primary"
         />
         <template v-if="!store.llm.useSystemKey">
           <v-text-field
@@ -84,7 +84,7 @@
 
     <v-btn
       block
-      :color="store.llmSaved ? 'teal' : 'white'"
+      :color="store.llmSaved ? 'primary' : 'muted'"
       :variant="store.llmSaved ? 'flat' : 'outlined'"
       :loading="saving"
       class="save-btn mt-3"
@@ -109,9 +109,9 @@ const toast = useToast();
 const saving = ref(false);
 
 const providers = [
-  { value: 'gemini' as LLMProvider, label: 'Gemini' },
-  { value: 'openai' as LLMProvider, label: 'OpenAI' },
   { value: 'bedrock' as LLMProvider, label: 'Bedrock' },
+  { value: 'openai' as LLMProvider, label: 'OpenAI' },
+  { value: 'gemini' as LLMProvider, label: 'Gemini' },
 ];
 
 function setProvider(p: LLMProvider) {
@@ -136,18 +136,18 @@ async function save() {
 
 <style scoped>
 .settings-panel { display: flex; flex-direction: column; gap: 12px; }
-.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-family: 'JetBrains Mono', monospace; }
+.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: rgb(var(--v-theme-muted)); font-family: 'JetBrains Mono', monospace; }
 .provider-pills { display: flex; gap: 6px; }
 .pill {
-  padding: 5px 14px; border-radius: 4px; border: 1px solid #374151;
-  background: transparent; color: #9ca3af; font-size: 12px; cursor: pointer;
+  padding: 5px 14px; border-radius: 4px; border: 1px solid rgb(var(--v-theme-border-strong));
+  background: transparent; color: rgb(var(--v-theme-muted)); font-size: 12px; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; transition: all 0.15s;
 }
-.pill:hover { border-color: #6b7280; color: #d1d5db; }
-.pill.active { border-color: #14b8a6; color: #14b8a6; background: rgba(20,184,166,0.08); }
+.pill:hover { border-color: rgb(var(--v-theme-subtle)); color: rgb(var(--v-theme-text-secondary)); }
+.pill.active { border-color: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.08); }
 .field-row { display: flex; gap: 10px; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 11px; color: #9ca3af; font-family: 'JetBrains Mono', monospace; }
+.field-label { font-size: 11px; color: rgb(var(--v-theme-muted)); font-family: 'JetBrains Mono', monospace; }
 .key-row { display: flex; align-items: center; gap: 12px; }
 .save-btn { font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; letter-spacing: 0.05em !important; }
 </style>

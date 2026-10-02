@@ -18,22 +18,15 @@ router = APIRouter(prefix="/export", tags=["Export"])
 def _get_md_path(repo_name: str, doc_variant: str) -> Path:
     """Return the active markdown file for the requested variant."""
     variant = str(doc_variant or "technical").strip().lower()
-    if variant == "functional":
-        candidates = [
-            WORKSPACE_DIR / "functional_documentation.md",
-            WORKSPACE_DIR / "documentation.md",
-        ]
-    else:
-        candidates = [
-            WORKSPACE_DIR / "documentation.md",
-            WORKSPACE_DIR / "functional_documentation.md",
-        ]
-    for p in candidates:
-        if p.exists():
-            return p
+    if variant not in {"technical", "functional"}:
+        raise HTTPException(status_code=422, detail="Invalid documentation variant.")
+    filename = "functional_documentation.md" if variant == "functional" else "documentation.md"
+    path = WORKSPACE_DIR / filename
+    if path.exists() and path.read_text(encoding="utf-8").strip():
+        return path
     raise HTTPException(
         status_code=404,
-        detail=f"No documentation file found in workspace for variant '{variant}'.",
+        detail=f"No {variant} documentation available for '{repo_name}'.",
     )
 
 

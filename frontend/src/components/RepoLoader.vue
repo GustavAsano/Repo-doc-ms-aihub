@@ -38,7 +38,7 @@
         @click="fileInput?.click()"
       >
         <input ref="fileInput" type="file" accept=".zip,.tar,.tar.gz,.tgz,.tar.bz2,.tar.xz,.7z" style="display:none" @change="onFileChange" />
-        <v-icon size="28" color="teal" class="mb-2">mdi-archive-arrow-up-outline</v-icon>
+        <v-icon size="28" color="primary" class="mb-2">mdi-archive-arrow-up-outline</v-icon>
         <div v-if="store.zipFile" class="zip-name">{{ store.zipFile.name }}</div>
         <div v-else class="drop-hint">Drop archive here or click to browse<br><span class="fmt-hint">.zip · .tar.gz · .tgz · .tar.bz2 · .tar.xz · .7z</span></div>
       </div>
@@ -46,13 +46,13 @@
 
     <!-- Library picker -->
     <div v-if="store.sourceType === 'library'" class="input-block">
-      <div v-if="store.library.length === 0" class="empty-library">
-        <v-icon color="#4b5563">mdi-archive-off-outline</v-icon>
+      <div v-if="availableLibrary.length === 0" class="empty-library">
+        <v-icon color="disabled">mdi-archive-off-outline</v-icon>
         <span>No saved repositories yet</span>
       </div>
       <div v-else class="library-list">
         <div
-          v-for="entry in store.library"
+          v-for="entry in availableLibrary"
           :key="entry.entry_key"
           class="lib-entry"
           :class="{ selected: store.selectedLibraryKey === entry.entry_key }"
@@ -104,7 +104,7 @@
     <!-- Action button -->
     <v-btn
       block
-      color="teal"
+      color="primary"
       :loading="store.loading"
       :disabled="!canLoad"
       class="load-btn"
@@ -127,6 +127,7 @@ import {
   uploadZip,
   loadRepoFromZip,
   activateLibraryEntry,
+  getDocsServer,
 } from '@/services/backend';
 
 const emit = defineEmits<{ loaded: [] }>();
@@ -141,8 +142,13 @@ const sourceOptions = [
   { value: 'library' as const, label: 'Library', icon: 'mdi-bookshelf' },
 ];
 
+const availableLibrary = computed(() => [
+  ...store.library.filter(entry => entry.docs_available || !store.functionalLibrary.some(functional => functional.entry_key === entry.entry_key)),
+  ...store.functionalLibrary.filter(entry => !store.library.some(technical => technical.entry_key === entry.entry_key && technical.docs_available)),
+]);
+
 const modes = [
-  { value: 'technical_only',           label: 'Technical docs' },
+  { value: 'technical_only',           label: 'Technical docs only' },
   { value: 'technical_and_functional', label: 'Technical + Functional' },
   { value: 'functional_only',          label: 'Functional docs only' },
 ];
@@ -176,6 +182,8 @@ function formatDate(d?: string) {
 
 async function load() {
   store.loading = true;
+  store.docsUrl = '';
+  store.mkdocsPort = null;
   store.loadingMessage = 'Loading repository…';
   try {
     let state;
@@ -186,10 +194,13 @@ async function load() {
       store.zipUploadedPath = upload.path;
       state = await loadRepoFromZip(upload.path, store.language);
     } else if (store.sourceType === 'library') {
-      state = await activateLibraryEntry(store.selectedLibraryKey, 'technical', true);
+      const entry = availableLibrary.value.find(item => item.entry_key === store.selectedLibraryKey);
+      const variant = entry?.functional_docs_available && (!entry.docs_available || !store.library.some(item => item.entry_key === entry.entry_key && item.docs_available)) ? 'functional' : 'technical';
+      state = await activateLibraryEntry(store.selectedLibraryKey, variant, true);
       if (state.mkdocs_port) {
         store.mkdocsPort = state.mkdocs_port;
-        store.docsUrl = '/docs/preview/';
+        const server = await getDocsServer();
+        store.docsUrl = server.preview_url + '?v=' + Date.now();
       }
     }
     store.repoState = state!;
@@ -211,42 +222,42 @@ async function load() {
 
 <style scoped>
 .repo-loader { display: flex; flex-direction: column; gap: 14px; }
-.source-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.source-tabs { display: flex; gap: 4px; flex-wrap: nowrap; }
 .tab-btn {
-  padding: 5px 13px; border-radius: 4px; border: 1px solid #374151;
-  background: transparent; color: #9ca3af; font-size: 12px; cursor: pointer;
+  flex: 1; min-width: 0; padding: 5px 4px; border-radius: 4px; border: 1px solid rgb(var(--v-theme-border-strong));
+  background: transparent; color: rgb(var(--v-theme-muted)); font-size: 12px; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; transition: all 0.15s;
-  display: flex; align-items: center;
+  display: flex; align-items: center; justify-content: center; white-space: nowrap;
 }
-.tab-btn:hover { border-color: #6b7280; color: #d1d5db; }
-.tab-btn.active { border-color: #14b8a6; color: #14b8a6; background: rgba(20,184,166,0.08); }
+.tab-btn:hover { border-color: rgb(var(--v-theme-subtle)); color: rgb(var(--v-theme-text-secondary)); }
+.tab-btn.active { border-color: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.08); }
 .input-block { display: flex; flex-direction: column; gap: 8px; }
 .drop-zone {
-  border: 1.5px dashed #374151; border-radius: 8px; padding: 28px 16px;
+  border: 1.5px dashed rgb(var(--v-theme-border-strong)); border-radius: 8px; padding: 28px 16px;
   text-align: center; cursor: pointer; transition: all 0.2s;
   display: flex; flex-direction: column; align-items: center;
 }
-.drop-zone:hover, .drop-zone.drag-over { border-color: #14b8a6; background: rgba(20,184,166,0.05); }
-.zip-name { color: #14b8a6; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-.drop-hint { color: #6b7280; font-size: 12px; line-height: 1.6; }
-.fmt-hint { color: #4b5563; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.05); }
+.zip-name { color: rgb(var(--v-theme-primary)); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.drop-hint { color: rgb(var(--v-theme-subtle)); font-size: 12px; line-height: 1.6; }
+.fmt-hint { color: rgb(var(--v-theme-disabled)); font-size: 10px; font-family: 'JetBrains Mono', monospace; }
 .library-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
 .lib-entry {
-  padding: 10px 12px; border-radius: 6px; border: 1px solid #374151;
+  padding: 10px 12px; border-radius: 6px; border: 1px solid rgb(var(--v-theme-border-strong));
   cursor: pointer; transition: all 0.15s;
 }
-.lib-entry:hover { border-color: #4b5563; background: #1f2937; }
-.lib-entry.selected { border-color: #14b8a6; background: rgba(20,184,166,0.08); }
-.lib-name { font-size: 13px; color: #e5e7eb; font-weight: 500; margin-bottom: 4px; }
+.lib-entry:hover { border-color: rgb(var(--v-theme-disabled)); background: rgb(var(--v-theme-border)); }
+.lib-entry.selected { border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.08); }
+.lib-name { font-size: 13px; color: rgb(var(--v-theme-text)); font-weight: 500; margin-bottom: 4px; }
 .lib-meta { display: flex; align-items: center; gap: 6px; }
 .badge { padding: 1px 7px; border-radius: 10px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
-.badge.lang { background: #1f2937; color: #9ca3af; border: 1px solid #374151; }
-.badge.tech { background: rgba(20,184,166,0.15); color: #14b8a6; }
-.badge.func { background: rgba(99,102,241,0.15); color: #818cf8; }
-.lib-date { font-size: 10px; color: #6b7280; margin-left: auto; }
-.empty-library { display: flex; align-items: center; gap: 8px; color: #6b7280; font-size: 13px; padding: 16px; }
+.badge.lang { background: rgb(var(--v-theme-border)); color: rgb(var(--v-theme-muted)); border: 1px solid rgb(var(--v-theme-border-strong)); }
+.badge.tech { background: rgba(var(--v-theme-primary), 0.15); color: rgb(var(--v-theme-primary)); }
+.badge.func { background: rgba(var(--v-theme-violet), 0.15); color: rgb(var(--v-theme-violet)); }
+.lib-date { font-size: 10px; color: rgb(var(--v-theme-subtle)); margin-left: auto; }
+.empty-library { display: flex; align-items: center; gap: 8px; color: rgb(var(--v-theme-subtle)); font-size: 13px; padding: 16px; }
 .options-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .opt-group { display: flex; flex-direction: column; gap: 5px; }
-.opt-label { font-size: 11px; color: #6b7280; font-family: 'JetBrains Mono', monospace; }
+.opt-label { font-size: 11px; color: rgb(var(--v-theme-subtle)); font-family: 'JetBrains Mono', monospace; }
 .load-btn { font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; letter-spacing: 0.04em !important; }
 </style>

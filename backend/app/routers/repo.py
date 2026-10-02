@@ -65,7 +65,8 @@ def _run_repo_map(repo_path: str, repo_name: str) -> tuple[dict, Path]:
     return result, code_json_path
 
 
-def _start_mkdocs(repo_name: str, repo_url: Optional[str] = None, author: Optional[str] = None) -> Optional[int]:
+def _start_mkdocs(repo_name: str, repo_url: Optional[str] = None, author: Optional[str] = None,
+                  doc_variant: str = "technical", language: str = "EN-US") -> Optional[int]:
     from app.src.mkdocs_ui import generate_mkdocs_config, serve_mkdocs
 
     generate_mkdocs_config(
@@ -73,7 +74,10 @@ def _start_mkdocs(repo_name: str, repo_url: Optional[str] = None, author: Option
         repo_name=repo_name,
         repo_url=repo_url,
         author=author,
+        doc_variant=doc_variant,
+        site_language=language,
     )
+    set_mkdocs_port(None)
     port, err = serve_mkdocs(WORKSPACE_DIR, port=None, force_restart=True)
     if err:
         print(f"[repo] MkDocs failed: {err}")
@@ -208,14 +212,18 @@ async def list_library(kind: str = "technical"):
         if not repo_name:
             continue
         resolved = resolve_library_entry_assets(repo_name, entry)
+        technical_available = kind != "functional" and bool(resolved.get("docs_available"))
+        functional_available = bool(resolved.get("functional_docs_available"))
+        if not technical_available and not functional_available:
+            continue
         entries.append(
             LibraryEntryResponse(
                 repo_name=repo_name,
                 language=_normalize_language(resolved.get("language")),
                 entry_key=entry_key,
                 updated_at=resolved.get("updated_at"),
-                docs_available=bool(resolved.get("docs_available")),
-                functional_docs_available=bool(resolved.get("functional_docs_available")),
+                docs_available=technical_available,
+                functional_docs_available=functional_available,
                 repo_url=resolved.get("repo_url"),
                 source_type=resolved.get("source_type"),
             )
@@ -262,12 +270,16 @@ async def activate_library_entry(
 
     library = load_repo_library()
     entry = library.get(entry_key)
+    if not isinstance(entry, dict) or (doc_variant == "functional" and not entry.get("functional_docs_available")):
+        entry = load_functional_library().get(entry_key)
     if not isinstance(entry, dict):
         raise HTTPException(status_code=404, detail="Library entry not found.")
 
     parsed_repo, _ = parse_library_entry_key(entry_key)
     repo_name = (entry.get("repo_name") or parsed_repo or "").strip()
     resolved = resolve_library_entry_assets(repo_name, entry)
+    if doc_variant not in {"technical", "functional"}:
+        raise HTTPException(status_code=422, detail="Invalid documentation variant.")
     docs_ok = activate_repo_assets(resolved, doc_variant=doc_variant)
     if not docs_ok:
         reset_workspace()
@@ -278,6 +290,8 @@ async def activate_library_entry(
             repo_name,
             repo_url=resolved.get("repo_url"),
             author=resolved.get("owner"),
+            doc_variant=doc_variant,
+            language=_normalize_language(resolved.get("language")),
         )
 
     graph_path = resolved.get("library_graph_json") or ""
@@ -294,11 +308,15 @@ async def activate_library_entry(
         language=_normalize_language(resolved.get("language")),
         output_dir=str(code_json.parent) if code_json.exists() else resolved.get("output_dir"),
         graph_path=str(graph_file) if graph_file.exists() else None,
-        docs_generated=bool(docs_ok),
+        docs_generated=bool((WORKSPACE_DIR / "documentation.md").is_file()),
         functional_docs_generated=bool(resolved.get("functional_docs_available")),
         docs_skipped=not docs_ok,
         doc_variant=doc_variant,
-        generation_mode=resolved.get("generation_mode") or "technical_only",
+        generation_mode=resolved.get("generation_mode") or (
+            "technical_and_functional" if (WORKSPACE_DIR / "documentation.md").is_file()
+            and (WORKSPACE_DIR / "functional_documentation.md").is_file()
+            else "functional_only" if doc_variant == "functional" else "technical_only"
+        ),
         mkdocs_port=port,
         library_entry_key=entry_key,
     )

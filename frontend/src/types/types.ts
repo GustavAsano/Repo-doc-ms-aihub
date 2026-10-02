@@ -35,9 +35,9 @@ export type Language = 'PT-BR' | 'EN-US' | 'ES-ES' | 'FR-FR' | 'DE-DE';
 export const LANGUAGES: { value: Language; label: string }[] = [
   { value: 'PT-BR', label: 'Português (BR)' },
   { value: 'EN-US', label: 'English (US)' },
-  { value: 'ES-ES', label: 'Español' },
-  { value: 'FR-FR', label: 'Français' },
-  { value: 'DE-DE', label: 'Deutsch' },
+  { value: 'ES-ES', label: 'Español (ES)' },
+  { value: 'FR-FR', label: 'Français (FR)' },
+  { value: 'DE-DE', label: 'Deutsch (DE)' },
 ];
 
 export interface SectionDefinition {
@@ -76,7 +76,7 @@ export interface RepoState {
 
 // ─── Progress ──────────────────────────────────────────────────────────────
 
-export type ProgressEventType = 'plan' | 'call_start' | 'call_end' | 'done' | 'error';
+export type ProgressEventType = 'plan' | 'call_start' | 'call_end' | 'phase_done' | 'done' | 'error';
 
 export interface ProgressEvent {
   event: ProgressEventType;

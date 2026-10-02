@@ -9,7 +9,7 @@
           <!-- LLM Settings -->
           <div class="side-section">
             <div class="side-title" @click="togglePanel('llm')">
-              <v-icon size="13" class="mr-2" color="teal">mdi-cpu-64-bit</v-icon>
+              <v-icon size="13" class="mr-2" color="primary">mdi-cpu-64-bit</v-icon>
               LLM Settings
               <v-icon size="14" class="ml-auto" :class="{ rotated: !panels.llm }">mdi-chevron-down</v-icon>
             </div>
@@ -23,7 +23,7 @@
           <!-- Repository -->
           <div class="side-section">
             <div class="side-title" @click="togglePanel('repo')">
-              <v-icon size="13" class="mr-2" color="teal">mdi-source-repository</v-icon>
+              <v-icon size="13" class="mr-2" color="primary">mdi-source-repository</v-icon>
               Repository
               <v-icon size="14" class="ml-auto" :class="{ rotated: !panels.repo }">mdi-chevron-down</v-icon>
             </div>
@@ -37,7 +37,7 @@
           <!-- Export -->
           <div class="side-section" v-if="store.hasActiveDocs">
             <div class="side-title" @click="togglePanel('export')">
-              <v-icon size="13" class="mr-2" color="#f59e0b">mdi-download-outline</v-icon>
+              <v-icon size="13" class="mr-2" color="warning">mdi-download-outline</v-icon>
               Export
               <v-icon size="14" class="ml-auto" :class="{ rotated: !panels.export }">mdi-chevron-down</v-icon>
             </div>
@@ -81,17 +81,17 @@
                 <div class="w-step" :class="{ done: store.llmSaved }">
                   <div class="step-num">1</div>
                   <div class="step-text">Configure LLM provider</div>
-                  <v-icon v-if="store.llmSaved" size="14" color="teal">mdi-check</v-icon>
+                  <v-icon v-if="store.llmSaved" size="14" color="primary">mdi-check</v-icon>
                 </div>
                 <div class="w-step" :class="{ done: !!store.repoState }">
                   <div class="step-num">2</div>
                   <div class="step-text">Load repository</div>
-                  <v-icon v-if="store.repoState" size="14" color="teal">mdi-check</v-icon>
+                  <v-icon v-if="store.repoState" size="14" color="primary">mdi-check</v-icon>
                 </div>
                 <div class="w-step" :class="{ done: store.hasActiveDocs }">
                   <div class="step-num">3</div>
                   <div class="step-text">Generate documentation</div>
-                  <v-icon v-if="store.hasActiveDocs" size="14" color="teal">mdi-check</v-icon>
+                  <v-icon v-if="store.hasActiveDocs" size="14" color="primary">mdi-check</v-icon>
                 </div>
               </div>
             </div>
@@ -176,13 +176,13 @@ const showFuncSections = computed(() =>
 
 const runStatusLabel = computed(() => {
   if (store.generating) return 'Generating';
-  if (store.repoState?.docs_generated) return 'Done';
+  if (store.hasActiveDocs) return 'Done';
   return 'Ready';
 });
 
 const runStatusClass = computed(() => {
   if (store.generating) return 'status-running';
-  if (store.repoState?.docs_generated) return 'status-done';
+  if (store.hasActiveDocs) return 'status-done';
   return 'status-idle';
 });
 
@@ -214,24 +214,24 @@ getLibrary('functional').then((entries) => { store.functionalLibrary = entries; 
 </script>
 
 <style scoped>
-.app-main { background: #080c12 !important; }
+.app-main { background: rgb(var(--v-theme-background)) !important; }
 .layout { display: flex; height: calc(100vh - 64px); overflow: hidden; }
 
 /* Sidebar */
-.sidebar { width: 320px; min-width: 280px; flex-shrink: 0; background: #0a0e17; border-right: 1px solid #1f2937; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar { width: 320px; min-width: 280px; flex-shrink: 0; background: rgb(var(--v-theme-panel)); border-right: 1px solid rgb(var(--v-theme-border)); display: flex; flex-direction: column; overflow: hidden; }
 .sidebar-scroll { flex: 1; overflow-y: auto; padding: 8px 0; }
 .sidebar-scroll::-webkit-scrollbar { width: 4px; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-.sidebar-scroll::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgb(var(--v-theme-border)); border-radius: 2px; }
 
 /* Side sections */
-.side-section { border-bottom: 1px solid #111827; }
+.side-section { border-bottom: 1px solid rgb(var(--v-theme-elevated)); }
 .side-title {
   display: flex; align-items: center; padding: 10px 16px; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase;
-  letter-spacing: 0.08em; color: #9ca3af; transition: color 0.15s; user-select: none;
+  letter-spacing: 0.08em; color: rgb(var(--v-theme-muted)); transition: color 0.15s; user-select: none;
 }
-.side-title:hover { color: #e5e7eb; }
+.side-title:hover { color: rgb(var(--v-theme-text)); }
 .side-title .rotated { transform: rotate(-90deg); }
 .panel-body { padding: 0 16px 14px; }
 
@@ -241,36 +241,36 @@ getLibrary('functional').then((entries) => { store.functionalLibrary = entries; 
 .collapse-enter-to, .collapse-leave-from { max-height: 600px; opacity: 1; }
 
 /* Content area */
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #080c12; }
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--v-theme-background)); }
 
 /* Tabs */
-.content-tabs { display: flex; gap: 0; padding: 0 16px; background: #0a0e17; border-bottom: 1px solid #1f2937; flex-shrink: 0; }
+.content-tabs { display: flex; gap: 0; padding: 0 16px; background: rgb(var(--v-theme-panel)); border-bottom: 1px solid rgb(var(--v-theme-border)); flex-shrink: 0; }
 .c-tab {
   padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent;
-  color: #6b7280; font-size: 12px; font-family: 'JetBrains Mono', monospace; cursor: pointer;
+  color: rgb(var(--v-theme-subtle)); font-size: 12px; font-family: 'JetBrains Mono', monospace; cursor: pointer;
   display: flex; align-items: center; transition: all 0.15s; margin-bottom: -1px;
 }
-.c-tab:hover { color: #9ca3af; }
-.c-tab.active { color: #14b8a6; border-bottom-color: #14b8a6; }
+.c-tab:hover { color: rgb(var(--v-theme-muted)); }
+.c-tab.active { color: rgb(var(--v-theme-primary)); border-bottom-color: rgb(var(--v-theme-primary)); }
 
 .tab-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 
 /* Welcome view */
 .welcome-view { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px; }
 .welcome-inner { max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
-.welcome-glyph { font-size: 48px; color: #1f2937; line-height: 1; }
-.welcome-h1 { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: #e5e7eb; letter-spacing: -0.02em; margin: 0; }
-.welcome-sub { font-size: 13px; color: #6b7280; line-height: 1.6; margin: 0; }
+.welcome-glyph { font-size: 48px; color: rgb(var(--v-theme-border)); line-height: 1; }
+.welcome-h1 { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: rgb(var(--v-theme-text)); letter-spacing: -0.02em; margin: 0; }
+.welcome-sub { font-size: 13px; color: rgb(var(--v-theme-subtle)); line-height: 1.6; margin: 0; }
 .welcome-steps { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px; }
 .w-step {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px;
-  background: #0d1117; border: 1px solid #1f2937; border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b7280;
+  background: rgb(var(--v-theme-surface)); border: 1px solid rgb(var(--v-theme-border)); border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgb(var(--v-theme-subtle));
   transition: border-color 0.2s;
 }
-.w-step.done { border-color: rgba(20,184,166,0.3); color: #9ca3af; }
-.step-num { width: 20px; height: 20px; border-radius: 50%; background: #1f2937; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #4b5563; flex-shrink: 0; }
-.w-step.done .step-num { background: rgba(20,184,166,0.15); color: #14b8a6; }
+.w-step.done { border-color: rgba(var(--v-theme-primary), 0.3); color: rgb(var(--v-theme-muted)); }
+.step-num { width: 20px; height: 20px; border-radius: 50%; background: rgb(var(--v-theme-border)); display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgb(var(--v-theme-disabled)); flex-shrink: 0; }
+.w-step.done .step-num { background: rgba(var(--v-theme-primary), 0.15); color: rgb(var(--v-theme-primary)); }
 .step-text { flex: 1; }
 
 /* Generate view */
@@ -281,27 +281,27 @@ getLibrary('functional').then((entries) => { store.functionalLibrary = entries; 
 /* Run status badge */
 .run-status-badge {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 12px; border-radius: 6px; border: 1px solid #1f2937;
+  padding: 6px 12px; border-radius: 6px; border: 1px solid rgb(var(--v-theme-border));
   font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  background: #0d1117; flex-shrink: 0;
+  background: rgb(var(--v-theme-surface)); flex-shrink: 0;
 }
-.run-status-badge.status-idle { border-color: #1f2937; }
-.run-status-badge.status-running { border-color: rgba(20,184,166,0.4); background: rgba(20,184,166,0.06); }
-.run-status-badge.status-done { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.06); }
+.run-status-badge.status-idle { border-color: rgb(var(--v-theme-border)); }
+.run-status-badge.status-running { border-color: rgba(var(--v-theme-primary), 0.4); background: rgba(var(--v-theme-primary), 0.06); }
+.run-status-badge.status-done { border-color: rgba(var(--v-theme-success), 0.4); background: rgba(var(--v-theme-success), 0.06); }
 .run-status-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: #374151; flex-shrink: 0;
+  width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--v-theme-border-strong)); flex-shrink: 0;
 }
-.run-status-badge.status-running .run-status-dot { background: #14b8a6; animation: pulse 1.2s infinite; }
-.run-status-badge.status-done .run-status-dot { background: #10b981; }
-.run-status-label { color: #9ca3af; }
-.run-status-badge.status-running .run-status-label { color: #14b8a6; }
-.run-status-badge.status-done .run-status-label { color: #10b981; }
-.run-status-phase { color: #6b7280; font-style: italic; }
-.run-status-calls { color: #4b5563; }
-.run-status-cost { color: #14b8a6; background: rgba(20,184,166,0.12); padding: 1px 6px; border-radius: 8px; }
+.run-status-badge.status-running .run-status-dot { background: rgb(var(--v-theme-primary)); animation: pulse 1.2s infinite; }
+.run-status-badge.status-done .run-status-dot { background: rgb(var(--v-theme-success)); }
+.run-status-label { color: rgb(var(--v-theme-muted)); }
+.run-status-badge.status-running .run-status-label { color: rgb(var(--v-theme-primary)); }
+.run-status-badge.status-done .run-status-label { color: rgb(var(--v-theme-success)); }
+.run-status-phase { color: rgb(var(--v-theme-subtle)); font-style: italic; }
+.run-status-calls { color: rgb(var(--v-theme-disabled)); }
+.run-status-cost { color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.12); padding: 1px 6px; border-radius: 8px; }
 @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.3); } }
-.generate-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: #e5e7eb; margin: 0; }
-.generate-sub { font-size: 12px; color: #6b7280; margin: 0; font-family: 'JetBrains Mono', monospace; }
+.generate-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: rgb(var(--v-theme-text)); margin: 0; }
+.generate-sub { font-size: 12px; color: rgb(var(--v-theme-subtle)); margin: 0; font-family: 'JetBrains Mono', monospace; }
 .generate-body { flex: 1; display: flex; gap: 24px; overflow: hidden; min-height: 0; }
 .gen-col { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
 .sections-col { flex: 1; min-width: 0; overflow-y: auto; }
@@ -309,7 +309,7 @@ getLibrary('functional').then((entries) => { store.functionalLibrary = entries; 
 .graph-inline-col { flex: 1; min-width: 0; overflow: hidden; }
 .gen-col-title {
   font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase;
-  letter-spacing: 0.08em; color: #9ca3af; display: flex; align-items: center;
-  padding-bottom: 8px; border-bottom: 1px solid #1f2937; flex-shrink: 0;
+  letter-spacing: 0.08em; color: rgb(var(--v-theme-muted)); display: flex; align-items: center;
+  padding-bottom: 8px; border-bottom: 1px solid rgb(var(--v-theme-border)); flex-shrink: 0;
 }
 </style>

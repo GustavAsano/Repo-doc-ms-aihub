@@ -116,7 +116,7 @@ export const generateDocs = (
     functional_sections?: Record<string, SectionDefinition>;
   },
   onEvent: (ev: Record<string, unknown>) => void,
-  onDone: () => void,
+  onDone: (result: RepoState) => void,
   onError: (msg: string) => void,
 ): AbortController => {
   const ctrl = new AbortController();
@@ -147,24 +147,39 @@ export const generateDocs = (
     const decoder = new TextDecoder();
     let buf = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() ?? '';
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const ev = JSON.parse(line.slice(6));
-            onEvent(ev);
-            if (ev.event === 'done') { onDone(); return; }
-            if (ev.event === 'error') { onError(ev.message ?? 'Generation error'); return; }
-          } catch { /* ignore malformed */ }
+    const processLine = (line: string): boolean => {
+      if (!line.startsWith('data: ')) return false;
+      let ev: Record<string, unknown>;
+      try { ev = JSON.parse(line.slice(6)); } catch { return false; }
+      onEvent(ev);
+      if (ev.event === 'done' && ev.result) {
+        onDone(ev.result as RepoState);
+        return true;
+      }
+      if (ev.event === 'error') {
+        onError(String(ev.message ?? 'Generation error'));
+        return true;
+      }
+      return false;
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (processLine(line)) { await reader.cancel(); return; }
         }
       }
+      buf += decoder.decode();
+      if (processLine(buf)) return;
+      onError('Generation stream ended before completion.');
+    } catch (e: unknown) {
+      if ((e as Error).name !== 'AbortError') onError(String(e));
     }
-    onDone();
   };
 
   doFetch();
@@ -173,8 +188,17 @@ export const generateDocs = (
 
 // ─── Docs server ───────────────────────────────────────────────────────────
 
-export const getDocsServer = async (): Promise<{ port: number; docs_url: string; entry_html: string }> => {
+export const getDocsServer = async (): Promise<{ port: number; docs_url: string; entry_html: string; preview_url: string }> => {
   const { data } = await axios.get(getEndpoint('/docs/server'), { headers: headers() });
+  return data;
+};
+
+export const selectDocVariant = async (
+  repoName: string, docVariant: 'technical' | 'functional', language: Language,
+): Promise<{ port: number; entry_html: string; preview_url: string }> => {
+  const { data } = await axios.post(getEndpoint('/docs/variant'), {
+    repo_name: repoName, doc_variant: docVariant, language,
+  }, { headers: headers() });
   return data;
 };
 

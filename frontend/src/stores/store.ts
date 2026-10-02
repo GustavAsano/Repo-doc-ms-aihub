@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import type { LLMSettings, RepoState, ChatMessage, Language, GenerationMode, SectionDefinition, LibraryEntry } from '@/types/types';
+import { selectDocVariant } from '@/services/backend';
 import { PROVIDER_MODELS } from '@/types/types';
 
 // ─── Default sections (mirrors doc_gen.py) ─────────────────────────────────
@@ -58,6 +59,7 @@ export interface AppStore {
   // Docs server
   docsUrl: string;
   mkdocsPort: number | null;
+  variantSwitching: boolean;
   // Chat
   chatHistory: ChatMessage[];
   chatLoading: boolean;
@@ -72,8 +74,8 @@ export interface AppStore {
 export const useAppStore = defineStore('app', {
   state: (): AppStore => ({
     llm: {
-      provider: 'gemini',
-      model: PROVIDER_MODELS.gemini[0],
+      provider: 'bedrock',
+      model: PROVIDER_MODELS.bedrock[0],
       useSystemKey: true,
       apiKey: '',
       bedrockAccessKey: '',
@@ -103,6 +105,7 @@ export const useAppStore = defineStore('app', {
     progressCost: null,
     docsUrl: '',
     mkdocsPort: null,
+    variantSwitching: false,
     chatHistory: [],
     chatLoading: false,
     chatSessions: [],
@@ -126,10 +129,29 @@ export const useAppStore = defineStore('app', {
           .map(([k, v]) => [k, { title: v.title, description: v.description }]),
       ),
     hasActiveDocs: (state) => !!state.repoState?.docs_generated || !!state.repoState?.functional_docs_generated,
+    availableDocVariants: (state): Array<'technical' | 'functional'> => {
+      const variants: Array<'technical' | 'functional'> = [];
+      if (state.repoState?.docs_generated) variants.push('technical');
+      if (state.repoState?.functional_docs_generated) variants.push('functional');
+      return variants;
+    },
+    selectedDocVariant: (state): 'technical' | 'functional' => state.repoState?.doc_variant ?? 'technical',
     repoName: (state) => state.repoState?.repo_name ?? '',
   },
 
   actions: {
+    async switchDocVariant(variant: 'technical' | 'functional') {
+      if (!this.repoState || this.variantSwitching || this.generating) return;
+      this.variantSwitching = true;
+      try {
+        const server = await selectDocVariant(this.repoState.repo_name, variant, this.repoState.language);
+        this.repoState.doc_variant = variant;
+        this.mkdocsPort = server.port;
+        this.docsUrl = server.preview_url + '?v=' + Date.now();
+      } finally {
+        this.variantSwitching = false;
+      }
+    },
     resetProgress() {
       this.progressEvents = [];
       this.progressCurrent = 0;

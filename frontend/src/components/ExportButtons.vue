@@ -10,24 +10,13 @@
         {{ loadingDocx ? 'Building…' : 'Download Word' }}
       </button>
     </div>
-    <div v-if="store.repoState?.functional_docs_generated" class="variant-row">
-      <span class="variant-label">Variant:</span>
-      <button
-        class="var-btn"
-        :class="{ active: variant === 'technical' }"
-        @click="variant = 'technical'"
-      >Technical</button>
-      <button
-        class="var-btn"
-        :class="{ active: variant === 'functional' }"
-        @click="variant = 'functional'"
-      >Functional</button>
-    </div>
+    <DocVariantSelector />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import DocVariantSelector from '@/components/DocVariantSelector.vue';
 import { useToast } from 'vue-toastification';
 import { useAppStore } from '@/stores/store';
 import { exportDoc } from '@/services/backend';
@@ -36,9 +25,8 @@ const store = useAppStore();
 const toast = useToast();
 const loadingPdf = ref(false);
 const loadingDocx = ref(false);
-const variant = ref<'technical' | 'functional'>('technical');
 
-const canExport = computed(() => store.repoState?.docs_generated || store.repoState?.functional_docs_generated);
+const canExport = computed(() => store.hasActiveDocs && !store.generating && !store.variantSwitching && !loadingPdf.value && !loadingDocx.value);
 
 async function doExport(format: 'pdf' | 'docx') {
   if (!store.repoState?.repo_name) return;
@@ -46,7 +34,7 @@ async function doExport(format: 'pdf' | 'docx') {
   else loadingDocx.value = true;
 
   try {
-    const res = await exportDoc(store.repoState.repo_name, format, store.language, variant.value);
+    const res = await exportDoc(store.repoState.repo_name, format, store.repoState.language, store.selectedDocVariant);
     // Trigger browser download from base64
     const mime = format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const blob = b64toBlob(res.data, mime);
@@ -77,22 +65,14 @@ function b64toBlob(b64: string, type: string): Blob {
 .export-panel { display: flex; flex-direction: column; gap: 10px; }
 .export-row { display: flex; gap: 8px; }
 .export-btn {
-  flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #374151;
-  background: transparent; color: #9ca3af; font-size: 12px; cursor: pointer;
+  flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid rgb(var(--v-theme-border-strong));
+  background: transparent; color: rgb(var(--v-theme-muted)); font-size: 12px; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; transition: all 0.15s;
   display: flex; align-items: center; justify-content: center;
 }
-.export-btn:hover:not(:disabled) { border-color: #6b7280; color: #e5e7eb; }
+.export-btn:hover:not(:disabled) { border-color: rgb(var(--v-theme-subtle)); color: rgb(var(--v-theme-text)); }
 .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.export-btn.pdf:hover:not(:disabled) { border-color: #ef4444; color: #fca5a5; }
-.export-btn.word:hover:not(:disabled) { border-color: #3b82f6; color: #93c5fd; }
+.export-btn.pdf:hover:not(:disabled) { border-color: rgb(var(--v-theme-error-strong)); color: rgb(var(--v-theme-error-light)); }
+.export-btn.word:hover:not(:disabled) { border-color: rgb(var(--v-theme-info)); color: rgb(var(--v-theme-info-light)); }
 .export-btn.loading { opacity: 0.7; cursor: wait; }
-.variant-row { display: flex; align-items: center; gap: 8px; }
-.variant-label { font-size: 10px; color: #6b7280; font-family: 'JetBrains Mono', monospace; }
-.var-btn {
-  padding: 3px 10px; border-radius: 3px; border: 1px solid #374151;
-  background: transparent; color: #6b7280; font-size: 11px; cursor: pointer;
-  font-family: 'JetBrains Mono', monospace; transition: all 0.12s;
-}
-.var-btn.active { border-color: #14b8a6; color: #14b8a6; }
 </style>

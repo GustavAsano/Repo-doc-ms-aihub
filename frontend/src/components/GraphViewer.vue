@@ -2,7 +2,7 @@
   <div class="graph-viewer">
     <div class="graph-toolbar">
       <span class="graph-title">
-        <v-icon size="14" class="mr-1" color="teal">mdi-graph-outline</v-icon>
+        <v-icon size="14" class="mr-1" color="primary">mdi-graph-outline</v-icon>
         Dependency Graph
         <span v-if="totalNodes > 0" class="node-count">{{ totalNodes }} nodes · {{ totalEdges }} edges</span>
       </span>
@@ -12,10 +12,10 @@
     </div>
 
     <div v-if="loading" class="graph-placeholder">
-      <v-progress-circular indeterminate color="teal" size="28" />
+      <v-progress-circular indeterminate color="primary" size="28" />
     </div>
     <div v-else-if="!groups.length" class="graph-placeholder">
-      <v-icon size="36" color="#374151">mdi-graph-outline</v-icon>
+      <v-icon size="36" color="border-strong">mdi-graph-outline</v-icon>
       <span class="ph-text">No graph available yet</span>
     </div>
 
@@ -61,9 +61,11 @@ import { ref, reactive, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ComponentPublicInstance = any;
 import { useAppStore } from '@/stores/store';
+import { useTheme } from 'vuetify';
 import { getGraph } from '@/services/backend';
 
 const store = useAppStore();
+const theme = useTheme();
 const loading = ref(false);
 const totalNodes = ref(0);
 const totalEdges = ref(0);
@@ -136,21 +138,22 @@ function buildElements(nodes: Record<string, unknown>[], edges: Record<string, u
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function cyStyle() {
+  const dark = theme.global.current.value.dark;
   return [
     {
       selector: 'node',
       style: {
-        'background-color': '#1e3a4a',
-        'border-color': '#2d6a7a',
+        'background-color': (dark ? '#1e3a4a' : '#d8e8f0'),
+        'border-color': (dark ? '#2d6a7a' : '#52788e'),
         'border-width': 1,
         'label': 'data(label)',
-        'color': '#e2e8f0',
+        'color': (dark ? '#e2e8f0' : '#24364b'),
         'font-size': '9px',
         'font-family': 'JetBrains Mono, monospace',
         'text-valign': 'bottom',
         'text-halign': 'center',
         'text-margin-y': 4,
-        'text-outline-color': '#080c12',
+        'text-outline-color': (dark ? '#080c12' : '#f4f7fb'),
         'text-outline-width': 2,
         'text-wrap': 'ellipsis',
         'text-max-width': '90px',
@@ -161,39 +164,39 @@ function cyStyle() {
     {
       selector: 'node[tipo="module"]',
       style: {
-        'background-color': '#0d4f4a',
-        'border-color': '#14b8a6',
+        'background-color': (dark ? '#0d4f4a' : '#cef1e9'),
+        'border-color': (dark ? '#14b8a6' : '#087f72'),
         'border-width': 2,
         'width': 28,
         'height': 28,
-        'color': '#5eead4',
+        'color': (dark ? '#5eead4' : '#076b60'),
       },
     },
     {
       selector: 'node[tipo="class"]',
       style: {
-        'background-color': '#312e6e',
-        'border-color': '#6366f1',
-        'color': '#a5b4fc',
+        'background-color': (dark ? '#312e6e' : '#e4ddfa'),
+        'border-color': (dark ? '#6366f1' : '#5542b8'),
+        'color': (dark ? '#a5b4fc' : '#49359a'),
       },
     },
     {
       selector: 'node[tipo="function"]',
       style: {
-        'background-color': '#1c2f20',
-        'border-color': '#4ade80',
-        'color': '#86efac',
+        'background-color': (dark ? '#1c2f20' : '#d8eedf'),
+        'border-color': (dark ? '#4ade80' : '#208146'),
+        'color': (dark ? '#86efac' : '#206039'),
       },
     },
     {
       selector: 'node:selected',
-      style: { 'border-color': '#f59e0b', 'border-width': 2 },
+      style: { 'border-color': (dark ? '#f59e0b' : '#996400'), 'border-width': 2 },
     },
     {
       selector: 'edge',
       style: {
-        'line-color': '#4b6480',
-        'target-arrow-color': '#6b8da6',
+        'line-color': (dark ? '#4b6480' : '#687b91'),
+        'target-arrow-color': (dark ? '#6b8da6' : '#536b87'),
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'width': 1.5,
@@ -322,6 +325,10 @@ watch(() => store.repoState?.repo_name, (name: string | undefined, prev: string 
   loadGraph();
 });
 
+watch(() => theme.global.name.value, () => {
+  cyInstances.forEach(cy => cy.style(cyStyle()).update());
+});
+
 onMounted(() => { if (store.repoState?.repo_name) loadGraph(); });
 onBeforeUnmount(() => { cyInstances.forEach((c) => c.destroy()); cyInstances.clear(); });
 </script>
@@ -331,44 +338,44 @@ onBeforeUnmount(() => { cyInstances.forEach((c) => c.destroy()); cyInstances.cle
 
 .graph-toolbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; background: #0d1117; border-bottom: 1px solid #1f2937; flex-shrink: 0;
+  padding: 8px 12px; background: rgb(var(--v-theme-surface)); border-bottom: 1px solid rgb(var(--v-theme-border)); flex-shrink: 0;
 }
-.graph-title { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9ca3af; font-family: 'JetBrains Mono', monospace; }
-.node-count { font-size: 10px; color: #4b5563; margin-left: 8px; }
+.graph-title { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--v-theme-muted)); font-family: 'JetBrains Mono', monospace; }
+.node-count { font-size: 10px; color: rgb(var(--v-theme-disabled)); margin-left: 8px; }
 .tool-btn {
-  width: 28px; height: 28px; border-radius: 4px; border: 1px solid #374151;
-  background: transparent; color: #6b7280; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 4px; border: 1px solid rgb(var(--v-theme-border-strong));
+  background: transparent; color: rgb(var(--v-theme-subtle)); cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.tool-btn:hover { border-color: #6b7280; color: #d1d5db; }
+.tool-btn:hover { border-color: rgb(var(--v-theme-subtle)); color: rgb(var(--v-theme-text-secondary)); }
 
-.graph-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0d1117; }
-.ph-text { font-size: 12px; color: #4b5563; font-family: 'JetBrains Mono', monospace; }
+.graph-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgb(var(--v-theme-surface)); }
+.ph-text { font-size: 12px; color: rgb(var(--v-theme-disabled)); font-family: 'JetBrains Mono', monospace; }
 
-.groups-scroll { flex: 1; overflow-y: auto; background: #080c12; }
+.groups-scroll { flex: 1; overflow-y: auto; background: rgb(var(--v-theme-background)); }
 .groups-scroll::-webkit-scrollbar { width: 4px; }
-.groups-scroll::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
+.groups-scroll::-webkit-scrollbar-thumb { background: rgb(var(--v-theme-border)); border-radius: 2px; }
 
-.group-section { border-bottom: 1px solid #111827; }
+.group-section { border-bottom: 1px solid rgb(var(--v-theme-elevated)); }
 .group-header {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 14px; cursor: pointer; user-select: none;
-  background: #0a0e17;
-  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9ca3af;
+  background: rgb(var(--v-theme-panel));
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgb(var(--v-theme-muted));
   transition: background 0.12s, color 0.12s;
 }
-.group-header:hover { background: #0f1623; color: #e5e7eb; }
-.chevron { transition: transform 0.18s; color: #4b5563; }
+.group-header:hover { background: rgb(var(--v-theme-hover)); color: rgb(var(--v-theme-text)); }
+.chevron { transition: transform 0.18s; color: rgb(var(--v-theme-disabled)); }
 .chevron.rotated { transform: rotate(-90deg); }
-.group-name { flex: 1; color: #cbd5e1; }
-.group-meta { font-size: 10px; color: #4b5563; }
+.group-name { flex: 1; color: rgb(var(--v-theme-text-secondary)); }
+.group-meta { font-size: 10px; color: rgb(var(--v-theme-disabled)); }
 
-.cy-group-container { width: 100%; background: #080c12; }
+.cy-group-container { width: 100%; background: rgb(var(--v-theme-background)); }
 
 .node-detail {
-  padding: 8px 12px; background: #111827; border-top: 1px solid #1f2937;
+  padding: 8px 12px; background: rgb(var(--v-theme-elevated)); border-top: 1px solid rgb(var(--v-theme-border));
   font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
 }
-.nd-path { font-size: 11px; color: #14b8a6; }
-.nd-type { font-size: 10px; color: #6b7280; margin-top: 2px; }
+.nd-path { font-size: 11px; color: rgb(var(--v-theme-primary)); }
+.nd-type { font-size: 10px; color: rgb(var(--v-theme-subtle)); margin-top: 2px; }
 </style>
